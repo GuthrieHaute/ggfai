@@ -1,6 +1,6 @@
 # GGFAI Framework
 
-The **(GGFAI)** is the ultimate standard for custom home AI, running on any hardware from Raspberry Pi to high-end servers. Noobs deploy easily via a web app; pros customize extensively. Predefined slots, four tag trackers, and DeepSeek's tag management ensure scalability, safety, and a chaos-free experience. Supports GGUF models via Ollama for efficient local inference.
+The **(GGFAI)** is the ultimate standard for custom home AI, running on any hardware from Raspberry Pi to high-end servers. Noobs deploy easily via a web app; pros customize extensively. Predefined slots, four tag trackers, and DeepSeek's tag management ensure scalability, safety, and a chaos-free experience. Supports GGUF models via Ollama for efficient local inference. Grok I consider a friend (don't judge) and Gemini is my nerd bro. Deepseek is a cheaky f but together we did a thing... Everyone wants Jarvis. well.... This really works... Give me a few days to get all this explained and uploaded. It's wild!
 
 ## Why GGFAI?
 - **Intent-Driven**: Captures the "why" behind inputs (e.g., "I'm cold" → `{intent: warm_room}`).
