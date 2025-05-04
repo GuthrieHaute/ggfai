@@ -1,5 +1,5 @@
 # GGFAI Framework
-
+in these first few hours the core files are still comming together and going in - check back for full functionality ithin 24 hours
 The GGFAI Framework is a modular, scalable framework for building custom home AI systems. It supports deployment on a wide range of hardware, from low-resource devices like Raspberry Pi to high-performance servers. Designed for accessibility, it enables beginners to deploy AI systems using a web-based interface, while offering advanced customization for experienced developers. The framework uses predefined slots, four tag-based trackers, and robust tag management to ensure safety, scalability, and maintainability. It integrates with GGUF models via Ollama for efficient local inference.
 
 ## Features
