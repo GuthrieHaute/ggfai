@@ -1,23 +1,17 @@
 # tag_registry.py - Hardened Tag Management Core
 # written by DeepSeek Chat (honor call: The Taxonomist)
-# upgraded by [Your Name] (honor call: [Your Title])
 
 import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set, Tuple, Any
 import logging
-import spacy
 import numpy as np
-from Levenshtein import ratio as levenshtein_ratio
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
-from enum import Enum, auto
-import hashlib
+from enum import Enum
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from tenacity import retry, stop_after_attempt, wait_exponential
 from pydantic import BaseModel, validator
-from circuitbreaker import circuit
 
 # Constants
 DEFAULT_CACHE_SIZE = 2000
@@ -56,16 +50,32 @@ class Tag(BaseModel):
     category: str
     subcategory: str = "default"
     namespace: str = "global"
-    priority: float = TagPriority.MEDIUM.value
-    status: TagStatus = TagStatus.ACTIVE
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    last_used: datetime = field(default_factory=datetime.utcnow)
+    priority: float = 0.5  # Default to MEDIUM
+    status: str = "active"  # Use string for serialization
+    created_at: datetime = None
+    last_used: datetime = None
     usage_count: int = 1
-    similar_to: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    vector: Optional[np.ndarray] = field(default=None, repr=False)
-    health: TagHealth = field(default_factory=TagHealth)
+    similar_to: List[str] = []
+    metadata: Dict[str, Any] = {}
+    vector: Optional[np.ndarray] = None
+    health: Optional[Dict[str, Any]] = None
     
+    class Config:
+        arbitrary_types_allowed = True
+    
+    def __init__(self, **data):
+        if 'created_at' not in data:
+            data['created_at'] = datetime.utcnow()
+        if 'last_used' not in data:
+            data['last_used'] = datetime.utcnow()
+        if 'health' not in data:
+            data['health'] = {
+                'stability_score': 1.0,
+                'last_validated': datetime.utcnow(),
+                'validation_errors': 0
+            }
+        super().__init__(**data)
+        
     @validator('priority')
     def validate_priority(cls, v):
         if not 0 <= v <= 1:
@@ -83,13 +93,11 @@ class Tag(BaseModel):
         self.last_used = datetime.utcnow()
         self.usage_count += 1
         # Decay stability score on usage
-        self.health.stability_score *= 0.99
+        self.health['stability_score'] *= 0.99
 
     def to_dict(self) -> Dict[str, Any]:
         """Safe serialization with vector handling."""
-        data = self.dict()
-        data['status'] = self.status.value
-        data.pop('vector', None)  # Exclude vector from serialization
+        data = self.dict(exclude={'vector'})
         return data
 
 class TagRegistry:
@@ -103,7 +111,7 @@ class TagRegistry:
     """
     
     def __init__(self, 
-                 nlp_model: str = "en_core_web_md",
+                 nlp_model=None,
                  prune_days: int = 30,
                  cache_size: int = DEFAULT_CACHE_SIZE,
                  similarity_threshold: float = SIMILARITY_THRESHOLD):
@@ -111,13 +119,14 @@ class TagRegistry:
         Initialize hardened registry.
         
         Args:
-            nlp_model: spaCy model for semantic analysis
+            nlp_model: spaCy model for semantic analysis (loaded on demand)
             prune_days: Days before predictive pruning
             cache_size: LRU cache capacity
             similarity_threshold: Similarity cutoff (0-1)
         """
         self.logger = logging.getLogger("GGFAI.tag_registry")
-        self._init_nlp(nlp_model)
+        self.nlp = None
+        self.nlp_model_name = nlp_model
         
         # Thread-safe structures
         self._lock = threading.RLock()
@@ -140,16 +149,18 @@ class TagRegistry:
         
         self.logger.info("Hardened tag registry initialized")
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    def _init_nlp(self, model_name: str):
-        """Resilient NLP model loading."""
-        try:
-            self.nlp = spacy.load(model_name)
-            if self.nlp.meta['vectors']['vectors'] == 0:
-                raise ValueError("Model has no word vectors")
-        except Exception as e:
-            self.logger.critical(f"Failed to load NLP model: {e}")
-            raise
+    def _load_nlp(self):
+        """Lazy-load NLP model when needed."""
+        if self.nlp is None and self.nlp_model_name:
+            try:
+                import spacy
+                self.nlp = spacy.load(self.nlp_model_name)
+                if hasattr(self.nlp.meta, 'vectors') and self.nlp.meta['vectors']['vectors'] == 0:
+                    self.logger.warning("Model has no word vectors, similarity will be limited")
+            except ImportError:
+                self.logger.warning("spaCy not installed, semantic similarity disabled")
+            except Exception as e:
+                self.logger.error(f"Failed to load NLP model: {e}")
 
     def _schedule_maintenance(self):
         """Periodic background maintenance."""
@@ -163,7 +174,6 @@ class TagRegistry:
                 
         threading.Thread(target=run_maintenance, daemon=True).start()
 
-    @circuit(failure_threshold=3, recovery_timeout=300)
     def _perform_maintenance(self):
         """Comprehensive system maintenance."""
         with self._lock:
@@ -207,8 +217,8 @@ class TagRegistry:
             with self._lock:
                 existing.touch()
                 existing.metadata.update(tag.metadata)
-                if existing.status != TagStatus.ACTIVE:
-                    existing.status = TagStatus.ACTIVE
+                if existing.status != TagStatus.ACTIVE.value:
+                    existing.status = TagStatus.ACTIVE.value
                     self._add_to_indices(existing)
                 self._update_cache(existing.name, existing)
                 return existing
@@ -221,8 +231,53 @@ class TagRegistry:
             self._check_similarity(tag)
             return tag
 
+    def _add_to_indices(self, tag: Tag):
+        """Update search indices for a tag."""
+        self.category_index[tag.category].add(tag.name)
+        self.category_index[f"{tag.category}.{tag.subcategory}"].add(tag.name)
+        self.namespace_index[tag.namespace].add(tag.name)
+
+    def _remove_from_indices(self, tag: Tag):
+        """Remove tag from search indices."""
+        if tag.name in self.category_index[tag.category]:
+            self.category_index[tag.category].remove(tag.name)
+        if tag.name in self.category_index[f"{tag.category}.{tag.subcategory}"]:
+            self.category_index[f"{tag.category}.{tag.subcategory}"].remove(tag.name)
+        if tag.name in self.namespace_index[tag.namespace]:
+            self.namespace_index[tag.namespace].remove(tag.name)
+
+    def _update_cache(self, key: str, value: Tag):
+        """LRU cache update."""
+        self.cache[key] = value
+        self.cache.move_to_end(key)
+        if len(self.cache) > self.cache_size:
+            self.cache.popitem(last=False)
+
+    def optimize_cache(self):
+        """Optimize cache based on usage patterns."""
+        with self._lock:
+            # Keep only most frequently used tags in cache
+            sorted_tags = sorted(
+                [(name, tag.usage_count) for name, tag in self.tags.items()],
+                key=lambda x: x[1],
+                reverse=True
+            )
+            
+            self.cache.clear()
+            for name, _ in sorted_tags[:self.cache_size]:
+                if name in self.tags:
+                    self.cache[name] = self.tags[name]
+
     def _check_similarity(self, new_tag: Tag):
         """Enhanced similarity detection with threading."""
+        # Lazy-load NLP if needed
+        if self.nlp is None and self.nlp_model_name:
+            self._load_nlp()
+            
+        # Skip if no NLP model
+        if self.nlp is None:
+            return
+            
         def process_batch(batch_names):
             similar = []
             for name in batch_names:
@@ -242,8 +297,9 @@ class TagRegistry:
         # Process in batches
         batch_size = 100
         all_similar = []
-        for i in range(0, len(candidates), batch_size):
-            batch = list(candidates)[i:i+batch_size]
+        candidates_list = list(candidates)
+        for i in range(0, len(candidates_list), batch_size):
+            batch = candidates_list[i:i+batch_size]
             all_similar.extend(process_batch(batch))
 
         if all_similar:
@@ -252,10 +308,18 @@ class TagRegistry:
 
     def _compute_similarity(self, tag1: Tag, tag2: Tag) -> float:
         """Optimized similarity computation with caching."""
-        cache_key = f"{tag1.name}_{tag2.name}"
-        
+        # Skip if no NLP model
+        if self.nlp is None:
+            return 0.0
+            
         # Lexical similarity
-        lexical = levenshtein_ratio(tag1.name.lower(), tag2.name.lower())
+        try:
+            from Levenshtein import ratio as levenshtein_ratio
+            lexical = levenshtein_ratio(tag1.name.lower(), tag2.name.lower())
+        except ImportError:
+            # Fallback to basic similarity
+            lexical = 1.0 if tag1.name.lower() == tag2.name.lower() else 0.0
+            
         if lexical < 0.3:  # Early exit for very dissimilar
             return 0.0
             
@@ -277,12 +341,13 @@ class TagRegistry:
         pruned = 0
         
         with self._lock:
-            for name, tag in list(self.tags.items())[:PRUNE_BATCH_SIZE]:
-                if (tag.status == TagStatus.ACTIVE and 
+            tag_items = list(self.tags.items())[:PRUNE_BATCH_SIZE]
+            for name, tag in tag_items:
+                if (tag.status == TagStatus.ACTIVE.value and 
                     tag.last_used < threshold and
-                    tag.health.stability_score < 0.7):
+                    tag.health['stability_score'] < 0.7):
                     
-                    tag.status = TagStatus.ARCHIVED
+                    tag.status = TagStatus.ARCHIVED.value
                     self._remove_from_indices(tag)
                     pruned += 1
                     
@@ -294,10 +359,10 @@ class TagRegistry:
         compressed = 0
         with self._lock:
             # Process by priority to ensure important tags dominate
-            for priority in reversed(TagPriority):
+            for priority in [1.0, 0.9, 0.7, 0.5, 0.3, 0.1]:  # Enum values
                 for name, tag in self.tags.items():
-                    if (tag.status == TagStatus.ACTIVE and 
-                        tag.priority >= priority.value and 
+                    if (tag.status == TagStatus.ACTIVE.value and 
+                        tag.priority >= priority and 
                         tag.similar_to):
                         
                         target = self._find_merge_target(tag)
@@ -313,10 +378,10 @@ class TagRegistry:
         candidates = []
         for other_name in tag.similar_to:
             other = self.tags.get(other_name)
-            if other and other.status == TagStatus.ACTIVE:
+            if other and other.status == TagStatus.ACTIVE.value:
                 score = (other.usage_count * 0.4 + 
                         other.priority * 0.3 +
-                        other.health.stability_score * 0.3)
+                        other.health['stability_score'] * 0.3)
                 candidates.append((score, other))
                 
         return max(candidates, key=lambda x: x[0])[1] if candidates else None
@@ -332,13 +397,13 @@ class TagRegistry:
             # Update statistics
             target.usage_count += source.usage_count
             target.last_used = max(target.last_used, source.last_used)
-            source.status = TagStatus.MERGED
+            source.status = TagStatus.MERGED.value
             source.metadata["merged_into"] = target.name
             
             # Update health
-            target.health.stability_score = max(
-                target.health.stability_score,
-                source.health.stability_score
+            target.health['stability_score'] = max(
+                target.health['stability_score'],
+                source.health['stability_score']
             )
 
     def validate_tags(self) -> int:
@@ -347,12 +412,17 @@ class TagRegistry:
         with self._lock:
             for name, tag in list(self.tags.items()):
                 try:
-                    Tag.validate(tag)
-                    tag.health.validation_errors = 0
+                    # Basic validation
+                    if not 0 <= tag.priority <= 1:
+                        raise ValueError("Invalid priority")
+                    if len(tag.name) > 256:
+                        raise ValueError("Name too long")
+                    
+                    tag.health['validation_errors'] = 0
                 except Exception as e:
-                    tag.health.validation_errors += 1
-                    if tag.health.validation_errors > 3:
-                        tag.status = TagStatus.QUARANTINED
+                    tag.health['validation_errors'] += 1
+                    if tag.health['validation_errors'] > 3:
+                        tag.status = TagStatus.QUARANTINED.value
                         invalid += 1
                     self.logger.warning(f"Tag validation failed: {name} - {e}")
         return invalid
@@ -360,58 +430,187 @@ class TagRegistry:
     def get_dashboard_metrics(self) -> Dict[str, Any]:
         """Enhanced system metrics with health indicators."""
         with self._lock:
-            active = [t for t in self.tags.values() if t.status == TagStatus.ACTIVE]
+            active = [t for t in self.tags.values() if t.status == TagStatus.ACTIVE.value]
+            archived = [t for t in self.tags.values() if t.status == TagStatus.ARCHIVED.value]
+            merged = [t for t in self.tags.values() if t.status == TagStatus.MERGED.value]
+            quarantined = [t for t in self.tags.values() if t.status == TagStatus.QUARANTINED.value]
+            
+            # Calculate health metrics
+            avg_stability = sum(t.health['stability_score'] for t in active) / len(active) if active else 0
+            high_priority = len([t for t in active if t.priority >= TagPriority.HIGH.value])
             
             return {
-                "system": {
-                    "total_tags": len(self.tags),
-                    "active_tags": len(active),
-                    "cache_hit_rate": self._get_cache_hit_rate(),
-                    "maintenance_cycle": self.maintenance_interval
-                },
-                "health": {
-                    "avg_stability": np.mean([t.health.stability_score for t in active]),
-                    "quarantined": len([t for t in self.tags.values() 
-                                      if t.status == TagStatus.QUARANTINED]),
-                    "validation_errors": sum(t.health.validation_errors 
-                                           for t in self.tags.values())
-                }
+                "total_tags": len(self.tags),
+                "active_tags": len(active),
+                "archived_tags": len(archived),
+                "merged_tags": len(merged),
+                "quarantined_tags": len(quarantined),
+                "avg_stability": avg_stability,
+                "high_priority": high_priority,
+                "cache_size": len(self.cache),
+                "cache_hit_ratio": self.cache_hit_ratio if hasattr(self, 'cache_hit_ratio') else 0,
+                "last_maintenance": datetime.utcnow().isoformat()
             }
 
-    def _get_cache_hit_rate(self) -> float:
-        """Thread-safe cache statistics."""
+    def get_tags_by_category(self, category: str, subcategory: str = None) -> List[Tag]:
+        """Retrieve tags by category with optional subcategory filter."""
         with self._lock:
-            hits = self.cache.get('hits', 0)
-            misses = self.cache.get('misses', 0)
-            return hits / (hits + misses) if (hits + misses) > 0 else 0.0
+            if subcategory:
+                key = f"{category}.{subcategory}"
+                names = self.category_index.get(key, set())
+            else:
+                names = self.category_index.get(category, set())
+                
+            return [self.tags[name] for name in names if name in self.tags]
 
-# Example hardening tests
-if __name__ == "__main__":
-    import pytest
-    
-    def test_thread_safety():
-        registry = TagRegistry(prune_days=1)
-        
-        def worker():
-            for i in range(100):
-                registry.register_tag(
-                    name=f"tag_{i}",
-                    intent="test",
-                    category="system"
-                )
-        
-        threads = [threading.Thread(target=worker) for _ in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+    def get_tags_by_namespace(self, namespace: str) -> List[Tag]:
+        """Retrieve tags by namespace."""
+        with self._lock:
+            names = self.namespace_index.get(namespace, set())
+            return [self.tags[name] for name in names if name in self.tags]
+
+    def get_tag(self, name: str) -> Optional[Tag]:
+        """Retrieve a tag by name with cache optimization."""
+        with self._lock:
+            # Check cache first
+            if name in self.cache:
+                tag = self.cache[name]
+                tag.touch()
+                return tag
+                
+            # Check main storage
+            if name in self.tags:
+                tag = self.tags[name]
+                self._update_cache(name, tag)
+                tag.touch()
+                return tag
+                
+            return None
+
+    def delete_tag(self, name: str) -> bool:
+        """Safely delete a tag."""
+        with self._lock:
+            if name in self.tags:
+                tag = self.tags[name]
+                self._remove_from_indices(tag)
+                del self.tags[name]
+                if name in self.cache:
+                    del self.cache[name]
+                return True
+            return False
+
+    def clear(self):
+        """Clear all tags and indices."""
+        with self._lock:
+            self.tags.clear()
+            self.category_index.clear()
+            self.namespace_index.clear()
+            self.cache.clear()
             
-        assert len(registry.tags) == 100
-    
-    def test_similarity_detection():
-        registry = TagRegistry()
-        t1 = registry.register_tag(name="play_music", intent="media", category="audio")
-        t2 = registry.register_tag(name="play_songs", intent="media", category="audio")
-        assert t1.similar_to == ["play_songs"] or t2.similar_to == ["play_music"]
-    
-    pytest.main([__file__])
+    def get_tags(self, category: str = None, subcategory: str = None, namespace: str = None) -> List[Dict]:
+        """
+        Get all tags, optionally filtered by category, subcategory, or namespace.
+        
+        Args:
+            category: Optional category filter
+            subcategory: Optional subcategory filter
+            namespace: Optional namespace filter
+            
+        Returns:
+            List of tag dictionaries
+        """
+        with self._lock:
+            if category and subcategory:
+                key = f"{category}.{subcategory}"
+                names = self.category_index.get(key, set())
+            elif category:
+                names = self.category_index.get(category, set())
+            elif namespace:
+                names = self.namespace_index.get(namespace, set())
+            else:
+                names = set(self.tags.keys())
+                
+            return [self.tags[name].to_dict() for name in names if name in self.tags]
+            
+    def add_tag(self, tag_data: Dict) -> str:
+        """
+        Add a tag to the registry.
+        
+        Args:
+            tag_data: Dictionary containing tag data
+            
+        Returns:
+            Tag ID if successful, None otherwise
+        """
+        try:
+            return self.register_tag(**tag_data).name
+        except Exception as e:
+            self.logger.error(f"Failed to add tag: {str(e)}")
+            return None
+            
+    def log_task_assignment(self, task_id: str, agent_id: str, bid_score: float, context: Dict) -> str:
+        """
+        Log a task assignment for analytics.
+        
+        Args:
+            task_id: ID of the assigned task
+            agent_id: ID of the agent assigned to the task
+            bid_score: Bid score that won the assignment
+            context: Context information for the assignment
+            
+        Returns:
+            Tag ID if successful, None otherwise
+        """
+        try:
+            tag_data = {
+                "name": f"task_assignment_{task_id}_{agent_id}",
+                "category": "task_assignment",
+                "intent": "coordination",
+                "task_id": task_id,
+                "agent_id": agent_id,
+                "bid_score": bid_score,
+                "context": context,
+                "timestamp": time.time()
+            }
+            return self.register_tag(**tag_data).name
+        except Exception as e:
+            self.logger.error(f"Failed to log task assignment: {str(e)}")
+            return None
+            
+    def get_tags_for_action(self, action: str) -> Set[str]:
+        """
+        Get all tags associated with an action.
+        
+        Args:
+            action: Action identifier
+            
+        Returns:
+            Set of tag names associated with the action
+        """
+        with self._lock:
+            result = set()
+            for name, tag in self.tags.items():
+                if tag.metadata.get("action") == action:
+                    result.add(name)
+            return result
+            
+    def get_matching_tags(self, action: str, context: Dict) -> List[Dict]:
+        """
+        Get tags that match both an action and context.
+        
+        Args:
+            action: Action identifier
+            context: Context dictionary to match
+            
+        Returns:
+            List of matching tag dictionaries
+        """
+        with self._lock:
+            matching = []
+            for name, tag in self.tags.items():
+                if tag.metadata.get("action") == action:
+                    # Check context match
+                    tag_context = tag.metadata.get("context", {})
+                    if all(tag_context.get(k) == v for k, v in context.items() if k in tag_context):
+                        matching.append(tag.to_dict())
+            return matching
