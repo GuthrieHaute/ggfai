@@ -1,75 +1,103 @@
-# resource_predictor.py - Hybrid ML/resource forecaster
-# written by DeepSeek Chat (honor call: The Oracle)
-
+"""
+Resource demand prediction and profiling
+"""
+from typing import Dict, List, Optional, Tuple
 import numpy as np
-from sklearn.ensemble import IsolationForest
-from statsmodels.tsa.arima.model import ARIMA
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
-from collections import deque
-import logging
+from enum import Enum
+import psutil
+import time
+from ..core.tag_registry import TagRegistry
+
+class ResourceType(Enum):
+    CPU = "cpu"
+    MEMORY = "memory"
+    DISK = "disk"
+    NETWORK = "network"
+
+class PredictionResult:
+    def __init__(self, mean: float, std: float, confidence_interval: Tuple[float, float]):
+        self.mean = mean
+        self.std = std
+        self.confidence_interval = confidence_interval
+
+class ResourceProfile:
+    def __init__(self):
+        self.cpu_usage: List[float] = []
+        self.memory_usage: List[float] = []
+        self.disk_usage: List[float] = []
+        self.network_usage: List[float] = []
+        self.timestamps: List[float] = []
+
+    def add_measurement(self, cpu: float, memory: float, disk: float = 0.0, network: float = 0.0):
+        self.cpu_usage.append(cpu)
+        self.memory_usage.append(memory)
+        self.disk_usage.append(disk)
+        self.network_usage.append(network)
+        self.timestamps.append(time.time())
 
 class ResourcePredictor:
-    def __init__(self, 
-                 window_size: int = 10,
-                 arima_order: tuple = (2,1,1)):
-        self.window_size = window_size
-        self.arima_order = arima_order
-        self.cpu_history = deque(maxlen=window_size)
-        self.mem_history = deque(maxlen=window_size)
-        self.lstm_models = {
-            'cpu': self._build_lstm(),
-            'mem': self._build_lstm()
-        }
-        self.logger = logging.getLogger("GGFAI.predictor")
-
-    def _build_lstm(self) -> Sequential:
-        """Build LSTM model for time-series prediction."""
-        model = Sequential([
-            LSTM(8, input_shape=(self.window_size-1, 1)),
-            Dense(1)
-        ])
-        model.compile(optimizer='adam', loss='mse')
-        return model
-
-    def _arima_predict(self, data: list, steps: int = 1) -> float:
-        """ARIMA prediction for short-term trends."""
-        try:
-            model = ARIMA(data, order=self.arima_order)
-            model_fit = model.fit()
-            return model_fit.forecast(steps=steps)[0]
-        except:
-            return np.mean(data[-3:])  # Fallback to moving average
-
-    def update_and_predict(self, 
-                         current_cpu: float,
-                         current_mem: float) -> Dict[str, Dict]:
-        """Update models and return predictions with confidence."""
-        self.cpu_history.append(current_cpu)
-        self.mem_history.append(current_mem)
+    def __init__(self, tag_registry: TagRegistry):
+        self.tag_registry = tag_registry
+        self.window_size = 10
         
+    def predict_resource_demand(
+        self, 
+        profile: ResourceProfile, 
+        prediction_steps: int = 5,
+        confidence_level: float = 0.95
+    ) -> Dict[ResourceType, PredictionResult]:
+        """Predict future resource demands using profile history."""
         predictions = {}
-        for resource, history in [('cpu', self.cpu_history), ('mem', self.mem_history)]:
-            if len(history) < self.window_size:
-                predictions[resource] = {
-                    'value': np.mean(history) if history else 0.5,
-                    'confidence': 0.5
-                }
-                continue
-
-            # Hybrid prediction: ARIMA for short-term, LSTM for longer trends
-            arima_pred = self._arima_predict(list(history))
+        
+        # CPU prediction
+        if profile.cpu_usage:
+            cpu_mean = np.mean(profile.cpu_usage[-self.window_size:])
+            cpu_std = np.std(profile.cpu_usage[-self.window_size:])
+            cpu_ci = self._calculate_confidence_interval(
+                cpu_mean, cpu_std, min(len(profile.cpu_usage), self.window_size), 
+                confidence_level
+            )
+            predictions[ResourceType.CPU] = PredictionResult(cpu_mean, cpu_std, cpu_ci)
             
-            lstm_input = np.array(history[:-1]).reshape(1, self.window_size-1, 1)
-            lstm_pred = self.lstm_models[resource].predict(lstm_input)[0][0]
+        # Memory prediction
+        if profile.memory_usage:
+            mem_mean = np.mean(profile.memory_usage[-self.window_size:])
+            mem_std = np.std(profile.memory_usage[-self.window_size:])
+            mem_ci = self._calculate_confidence_interval(
+                mem_mean, mem_std, min(len(profile.memory_usage), self.window_size),
+                confidence_level
+            )
+            predictions[ResourceType.MEMORY] = PredictionResult(mem_mean, mem_std, mem_ci)
             
-            # Weighted ensemble
-            hybrid_pred = 0.7 * arima_pred + 0.3 * lstm_pred
-            confidence = 1 - (np.std(history) / np.mean(history))  # Simple confidence metric
-            
-            predictions[resource] = {
-                'value': max(0, min(1, hybrid_pred)),
-                'confidence': max(0.1, min(1, confidence))
-            }
-
         return predictions
+
+    def _calculate_confidence_interval(
+        self, 
+        mean: float, 
+        std: float, 
+        n: int, 
+        confidence_level: float
+    ) -> Tuple[float, float]:
+        """Calculate confidence interval using normal distribution."""
+        from scipy import stats
+        
+        confidence = 1.0 - ((1.0 - confidence_level) / 2.0)
+        z_value = stats.norm.ppf(confidence)
+        margin = z_value * (std / np.sqrt(n))
+        
+        return (mean - margin, mean + margin)
+
+    def get_current_profile(self) -> ResourceProfile:
+        """Get current system resource profile."""
+        profile = ResourceProfile()
+        
+        cpu = psutil.cpu_percent(interval=1) / 100.0
+        memory = psutil.virtual_memory().percent / 100.0
+        disk = psutil.disk_usage('/').percent / 100.0
+        
+        # Get network I/O stats
+        net_io = psutil.net_io_counters()
+        network = (net_io.bytes_sent + net_io.bytes_recv) / 1024 / 1024  # Convert to MB
+        
+        profile.add_measurement(cpu, memory, disk, network)
+        return profile

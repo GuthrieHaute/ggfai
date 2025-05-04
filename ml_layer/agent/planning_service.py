@@ -1,16 +1,30 @@
 # planning_service.py - Hierarchical Task Network planner for GGFAI
 # written by DeepSeek Chat (honor call: The Strategist)
+# Enhanced with Tag Analyzer integration
 
-from typing import Dict, List, Optional, Tuple, Set
+"""
+Hierarchical Task Network planner with Tag Analysis integration
+"""
+from __future__ import annotations
+from typing import Dict, List, Optional, Set, Any
 import logging
+import time
 from enum import Enum
 import numpy as np
 from dataclasses import dataclass, field
 import networkx as nx
 from pyvis.network import Network
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+
+from .tag_analyzer import TagAnalyzer, AnalysisMethod
+from .learning import LearningService
+
+logger = logging.getLogger("GGFAI.planning")
 
 class PlanStatus(Enum):
+    """Plan execution states"""
     DRAFT = "draft"
     ACTIVE = "active"
     COMPLETED = "completed"
@@ -19,6 +33,7 @@ class PlanStatus(Enum):
 
 @dataclass
 class PlanStep:
+    """Individual step in an execution plan"""
     action: str
     parameters: Dict[str, Any]
     preconditions: Set[str]
@@ -30,6 +45,7 @@ class PlanStep:
 
 @dataclass
 class Plan:
+    """Complete execution plan"""
     goal: str
     steps: List[PlanStep]
     created_at: float = field(default_factory=time.time)
@@ -38,413 +54,423 @@ class Plan:
     cost_estimate: float = 0.0
     success_probability: float = 1.0
     tags: Set[str] = field(default_factory=set)
+    _lock: Lock = field(default_factory=Lock, init=False, repr=False)
+
+    def update_status(self, new_status: PlanStatus) -> None:
+        """Thread-safe status update"""
+        with self._lock:
+            self.status = new_status
 
 class PlanningService:
     """
-    Hierarchical Task Network planner with PDDL-inspired capabilities.
-    Supports multi-agent coordination, plan explanation, and adaptive replanning.
+    HTN planner with tag analysis integration.
+    Supports multi-agent coordination and adaptive replanning.
     """
     
-    def __init__(self, domain_knowledge: Dict[str, Any]):
-        """
-        Initialize with domain knowledge about actions, resources, and agents.
-        
-        Args:
-            domain_knowledge: Dictionary containing:
-                - actions: Available actions and their parameters
-                - resources: Available resources in the system
-                - agent_capabilities: What each agent can do
-        """
-        self.logger = logging.getLogger("GGFAI.planning")
+    def __init__(self, domain_knowledge: Dict[str, Any], tag_analyzer: TagAnalyzer):
+        """Initialize planner with domain knowledge and tag analyzer"""
+        self.logger = logger
         self.domain = domain_knowledge
         self.current_plans: Dict[str, Plan] = {}
         self.plan_history: List[Plan] = []
-        
-        # Initialize HTN methods
-        self._build_htn_methods()
-        
-        # Planning heuristics
-        self.heuristics = {
-            'resource_usage': self._resource_usage_heuristic,
-            'tag_priority': self._tag_priority_heuristic
-        }
-        
-        self.logger.info("Planning service initialized")
-
-    def _build_htn_methods(self):
-        """Precompile HTN decomposition methods from domain knowledge."""
+        self.tag_analyzer = tag_analyzer
+        self._executor = ThreadPoolExecutor(max_workers=4)
+        self._lock = Lock()
+        self.plan_cache = {}
         self.htn_methods = defaultdict(list)
         
+        self._validate_domain()
+        self._build_htn_methods()
+        
+        logger.info("Planning service initialized with tag analyzer integration")
+
+    def _validate_domain(self) -> None:
+        """Validate domain knowledge structure"""
+        required = {'actions', 'resources', 'agent_capabilities'}
+        if not all(key in self.domain for key in required):
+            raise ValueError(f"Domain missing required keys: {required - set(self.domain.keys())}")
+            
+        for action, config in self.domain['actions'].items():
+            if not isinstance(config, dict):
+                raise ValueError(f"Invalid action configuration for {action}")
+            if 'decomposition' in config:
+                for method in config['decomposition']:
+                    if 'steps' not in method:
+                        raise ValueError(f"HTN method for {action} missing steps")
+
+    def _build_htn_methods(self) -> None:
+        """Build HTN decomposition methods"""
         for action_name, action_data in self.domain['actions'].items():
             if 'decomposition' in action_data:
                 for method in action_data['decomposition']:
-                    self.htn_methods[action_name].append({
+                    validated_method = {
+                        'action': action_name,
                         'preconds': set(method.get('preconditions', [])),
+                        'effects': set(method.get('effects', [])),
                         'steps': method['steps'],
-                        'priority': method.get('priority', 0.5)
-                    })
+                        'priority': float(method.get('priority', 0.5))
+                    }
+                    self.htn_methods[action_name].append(validated_method)
 
-    def create_plan(self, 
-                   goal: str,
-                   tags: Set[str],
-                   available_resources: List[str],
-                   priority: float = 0.7) -> Optional[Plan]:
-        """
-        Create a plan to achieve given goal using HTN planning.
-        
-        Args:
-            goal: The goal to achieve (must match an HTN task)
-            tags: Relevant tags for contextual planning
-            available_resources: Currently available resources
-            priority: Priority of this planning request
+    def create_plan(self, goal: str, tags: Set[str], available_resources: List[str], priority: float = 0.7) -> Optional[Plan]:
+        """Create execution plan using HTN planning with tag analysis"""
+        try:
+            # Get tag rankings 
+            ranked_tags = self.tag_analyzer.rank_tags(list(tags), context={"goal": goal})
             
-        Returns:
-            A Plan object or None if planning fails
-        """
-        if goal not in self.htn_methods:
-            self.logger.error(f"No HTN methods available for goal: {goal}")
-            return None
-            
-        # Select best HTN method based on preconditions and priority
-        applicable_methods = []
-        for method in self.htn_methods[goal]:
-            if method['preconds'].issubset(tags):
-                applicable_methods.append(method)
+            # Filter methods by tag relevance
+            relevant_methods = []
+            for tag_info in ranked_tags:
+                matching_methods = [
+                    method for method in self.htn_methods[tag_info["name"]]
+                    if method["preconds"].issubset(tags)
+                ]
+                # Weight methods by tag relevance
+                for method in matching_methods:
+                    method["priority"] *= tag_info["score"]
+                relevant_methods.extend(matching_methods)
                 
-        if not applicable_methods:
-            self.logger.error(f"No applicable methods for goal: {goal}")
-            return None
-            
-        # Select method with highest priority
-        selected_method = max(applicable_methods, key=lambda x: x['priority'])
-        
-        # Build plan steps
-        steps = []
-        for step_desc in selected_method['steps']:
-            action = self.domain['actions'].get(step_desc['action'])
-            if not action:
-                continue
+            if not relevant_methods:
+                self.logger.warning(f"No applicable methods found for goal: {goal}")
+                return None
                 
-            step = PlanStep(
-                action=step_desc['action'],
-                parameters=step_desc.get('parameters', {}),
-                preconditions=set(action.get('preconditions', [])),
-                effects=set(action.get('effects', [])),
-                duration=action.get('duration', 1.0),
+            # Select highest priority method
+            selected_method = max(relevant_methods, key=lambda x: x["priority"])
+            
+            # Build plan steps
+            steps = []
+            for step_config in selected_method["steps"]:
+                step = PlanStep(
+                    action=step_config["action"],
+                    parameters=step_config.get("parameters", {}),
+                    preconditions=set(step_config.get("preconditions", [])),
+                    effects=set(step_config.get("effects", [])),
+                    duration=float(step_config.get("duration", 1.0)),
+                    priority=priority * step_config.get("priority", 0.5),
+                    required_resources=list(step_config.get("required_resources", []))
+                )
+                steps.append(step)
+                
+            # Validate resource availability
+            if not self._check_resources(steps, available_resources):
+                self.logger.error("Insufficient resources for plan execution")
+                return None
+                
+            plan = Plan(
+                goal=goal,
+                steps=steps,
                 priority=priority,
-                required_resources=action.get('required_resources', [])
+                tags=tags,
+                success_probability=self._estimate_success_probability(steps)
             )
-            steps.append(step)
-        
-        # Verify resource availability
-        if not self._check_resource_availability(steps, available_resources):
-            self.logger.error("Insufficient resources for plan")
+            
+            with self._lock:
+                self.current_plans[goal] = plan
+                self.plan_history.append(plan)
+                
+            return plan
+            
+        except Exception as e:
+            self.logger.error(f"Plan creation failed: {str(e)}")
             return None
-            
-        plan = Plan(
-            goal=goal,
-            steps=steps,
-            priority=priority,
-            tags=tags,
-            cost_estimate=sum(step.duration for step in steps),
-            success_probability=self._estimate_success_probability(steps)
-        )
-        
-        self.current_plans[goal] = plan
-        return plan
-
-    def _check_resource_availability(self, 
-                                  steps: List[PlanStep],
-                                  available_resources: List[str]) -> bool:
-        """Verify all required resources are available."""
-        required = set()
-        for step in steps:
-            required.update(step.required_resources)
-            
-        return required.issubset(available_resources)
-
-    def _estimate_success_probability(self, steps: List[PlanStep]) -> float:
-        """Estimate plan success probability based on step reliability."""
-        if not steps:
-            return 0.0
-            
-        # Simple product of step reliabilities (could be enhanced with ML)
-        reliability = 1.0
-        for step in steps:
-            action_data = self.domain['actions'].get(step.action, {})
-            reliability *= action_data.get('reliability', 0.9)
-            
-        return reliability
 
     def execute_plan(self, plan: Plan) -> bool:
-        """Execute a plan and handle step transitions."""
-        plan.status = PlanStatus.ACTIVE
-        self.logger.info(f"Executing plan for goal: {plan.goal}")
-        
-        for i, step in enumerate(plan.steps):
-            if plan.status != PlanStatus.ACTIVE:
-                break
+        """Execute plan with comprehensive error handling"""
+        if not plan or not plan.steps:
+            return False
+            
+        with plan._lock:
+            plan.status = PlanStatus.ACTIVE
+            self.logger.info(f"Executing plan for goal: {plan.goal}")
+            
+            try:
+                for step in plan.steps:
+                    self._execute_step(step, plan)
+                    if plan.status != PlanStatus.ACTIVE:
+                        break
+                        
+                if plan.status == PlanStatus.ACTIVE:
+                    plan.status = PlanStatus.COMPLETED
+                    return True
+                    
+            except Exception as e:
+                self.logger.error(f"Plan execution failed: {str(e)}")
+                plan.status = PlanStatus.FAILED
                 
-            self._execute_step(step, plan)
-            
-        if plan.status == PlanStatus.ACTIVE:
-            plan.status = PlanStatus.COMPLETED
-            self.logger.info(f"Plan completed: {plan.goal}")
-            return True
-            
-        return False
+            return False
 
-    def _execute_step(self, step: PlanStep, plan: Plan):
-        """Execute a single plan step with error handling."""
+    def _execute_step(self, step: PlanStep, plan: Plan) -> None:
+        """Execute single plan step with validation"""
         try:
             self.logger.info(f"Executing step: {step.action}")
-            # TODO: Actual execution would interface with agents
+            
+            # Validate preconditions
+            if not step.preconditions.issubset(plan.tags):
+                raise ValueError(f"Preconditions not met for step: {step.action}")
+                
+            # Execute action (placeholder - would call actual implementation)
+            step.status = PlanStatus.ACTIVE
+            action_impl = self.domain["actions"][step.action]["implementation"]
+            success = action_impl(step.parameters)
+            
+            if not success:
+                step.status = PlanStatus.FAILED
+                plan.status = PlanStatus.FAILED
+                return
+                
+            # Update plan state
+            plan.tags.update(step.effects)
             step.status = PlanStatus.COMPLETED
             
-            # Check if any effects invalidate remaining steps
-            for future_step in plan.steps[plan.steps.index(step)+1:]:
-                if not future_step.preconditions.issubset(plan.tags | step.effects):
-                    plan.status = PlanStatus.ABORTED
-                    self.logger.warning(
-                        f"Plan aborted - step {future_step.action} preconditions not met")
-                    break
-                    
+            # Validate remaining steps
+            self._validate_remaining_steps(step, plan)
+            
         except Exception as e:
-            self.logger.error(f"Step failed: {step.action} - {str(e)}")
+            self.logger.error(f"Step execution failed: {str(e)}")
             step.status = PlanStatus.FAILED
             plan.status = PlanStatus.FAILED
 
-    def visualize_plan(self, plan: Plan, filename: str = "plan.html"):
-        """Generate interactive visualization of the plan."""
-        net = Network(height="750px", width="100%", directed=True)
-        
-        # Add nodes for each step
-        for i, step in enumerate(plan.steps):
-            label = f"{i+1}. {step.action}\nDuration: {step.duration}h"
-            net.add_node(i, label=label, title=str(step.parameters))
+    def _validate_remaining_steps(self, current_step: PlanStep, plan: Plan) -> None:
+        """Validate that current step hasn't invalidated future steps"""
+        for future_step in plan.steps[plan.steps.index(current_step) + 1:]:
+            if not future_step.preconditions.issubset(plan.tags):
+                plan.status = PlanStatus.ABORTED
+                self.logger.warning(
+                    f"Plan aborted - step {future_step.action} preconditions no longer satisfied"
+                )
+                break
+
+    def _check_resources(self, steps: List[PlanStep], available_resources: List[str]) -> bool:
+        """Check if required resources are available for all steps"""
+        available = set(available_resources)
+        for step in steps:
+            if not set(step.required_resources).issubset(available):
+                return False
+        return True
+
+    def _estimate_success_probability(self, steps: List[PlanStep]) -> float:
+        """Estimate plan success probability using step reliabilities"""
+        if not steps:
+            return 0.0
             
-            # Add edges for dependencies
-            if i > 0:
-                net.add_edge(i-1, i)
+        reliability = 1.0
+        for step in steps:
+            action_config = self.domain["actions"].get(step.action, {})
+            step_reliability = action_config.get("reliability", 0.9)
+            reliability *= step_reliability
+            
+        # Apply sigmoid to map reliability to [0,1] with steeper curve
+        return 1.0 / (1.0 + np.exp(-10 * (reliability - 0.5)))
+
+    def get_plan_by_trace(self, trace_id: str) -> Optional[Plan]:
+        """Retrieve plan by trace ID for explanation generation"""
+        # First check current plans
+        for plan in self.current_plans.values():
+            if trace_id in plan.tags:
+                return plan
                 
-        # Add goal node
-        net.add_node(len(plan.steps), 
-                   label=f"GOAL: {plan.goal}", 
-                   color="green")
-        if plan.steps:
-            net.add_edge(len(plan.steps)-1, len(plan.steps))
-            
-        net.show(filename)
-
-    def adapt_plan(self, 
-                  original_plan: Plan,
-                  changes: Dict[str, Any]) -> Optional[Plan]:
-        """
-        Adapt an existing plan based on changes in context.
-        
-        Args:
-            original_plan: The plan to adapt
-            changes: Dictionary describing changes:
-                - new_tags: Set of new relevant tags
-                - removed_tags: Set of no-longer-relevant tags
-                - resource_changes: Changes in resource availability
+        # Then check history
+        for plan in reversed(self.plan_history):
+            if trace_id in plan.tags:
+                return plan
                 
-        Returns:
-            Adapted Plan or None if replanning fails
+        return None
+
+    def adapt_plan(self, original_plan: Plan, changes: Dict[str, Any]) -> Optional[Plan]:
         """
-        new_tags = (original_plan.tags - changes.get('removed_tags', set())) | \
-                   changes.get('new_tags', set())
-                   
-        available_resources = self._get_current_resources()
-        if 'resource_changes' in changes:
-            available_resources = (available_resources - 
-                                  changes['resource_changes'].get('removed', set())) | \
-                                 changes['resource_changes'].get('added', set())
-                                 
-        return self.create_plan(
-            goal=original_plan.goal,
-            tags=new_tags,
-            available_resources=available_resources,
-            priority=original_plan.priority
-        )
-
-    def _get_current_resources(self) -> Set[str]:
-        """Get currently available resources (simplified)."""
-        return set(self.domain['resources'])
-
-# learning.py - Bandit learning for dynamic agents
-# written by DeepSeek Chat (honor call: The Adaptive Learner)
-
-class BanditLearner:
-    """Implements UCB1 bandit algorithm for feature selection."""
-    
-    def __init__(self, arms: List[str]):
-        """
-        Initialize with possible arms (features/actions).
+        Adapt existing plan based on context changes.
         
         Args:
-            arms: List of possible arms to pull
+            original_plan: Plan to adapt
+            changes: Dict containing:
+                - new_tags: New tags to consider
+                - removed_tags: Tags no longer relevant
+                - resource_changes: Resource availability changes
         """
-        self.arms = arms
-        self.counts = {arm: 0 for arm in arms}
-        self.values = {arm: 0.0 for arm in arms}
-        self.total_pulls = 0
-
-    def select_arm(self) -> str:
-        """Select an arm using UCB1 algorithm."""
-        unexplored = [arm for arm in self.arms if self.counts[arm] == 0]
-        if unexplored:
-            return unexplored[0]
+        if not original_plan:
+            return None
             
-        ucb_values = {
-            arm: self.values[arm] + 
-                 np.sqrt(2 * np.log(self.total_pulls) / self.counts[arm])
-            for arm in self.arms
-        }
-        return max(ucb_values.items(), key=lambda x: x[1])[0]
-
-    def update(self, arm: str, reward: float):
-        """Update arm values based on observed reward."""
-        self.counts[arm] += 1
-        self.total_pulls += 1
-        
-        # Update moving average
-        self.values[arm] += (reward - self.values[arm]) / self.counts[arm]
-
-# coordinator.py - Multi-agent coordination protocols
-# written by DeepSeek Chat (honor call: The Negotiator)
-
-class CoordinationProtocol:
-    """Implements contract net protocol for multi-agent coordination."""
-    
-    def __init__(self, agents: List[str]):
-        """
-        Initialize with known agents.
-        
-        Args:
-            agents: List of agent IDs in the system
-        """
-        self.agents = agents
-        self.task_announcements = {}
-        self.bids = defaultdict(dict)
-        self.assignments = {}
-
-    def announce_task(self, 
-                     task: Dict[str, Any],
-                     deadline: float = 5.0) -> Dict[str, Any]:
-        """
-        Announce a task to all agents using contract net protocol.
-        
-        Args:
-            task: Dictionary describing the task
-            deadline: Time in seconds to wait for bids
+        try:
+            # Update tags
+            new_tags = (original_plan.tags - changes.get("removed_tags", set())) | \
+                      changes.get("new_tags", set())
+                      
+            # Update resources
+            available_resources = set(self.domain["resources"])
+            if "resource_changes" in changes:
+                rc = changes["resource_changes"]
+                available_resources = (available_resources - rc.get("removed", set())) | \
+                                   rc.get("added", set())
+                                   
+            # Create new plan with updated context
+            return self.create_plan(
+                goal=original_plan.goal,
+                tags=new_tags,
+                available_resources=list(available_resources),
+                priority=original_plan.priority
+            )
             
-        Returns:
-            Dictionary with assignment results
-        """
-        task_id = hashlib.sha256(str(task).encode()).hexdigest()[:8]
-        self.task_announcements[task_id] = {
-            'task': task,
-            'announce_time': time.time(),
-            'deadline': deadline,
-            'status': 'open'
-        }
-        
-        # Simulate bids from agents (in real system this would be async)
-        for agent in self.agents:
-            # TODO: Actual agents would compute bids based on capabilities
-            bid = {
-                'agent': agent,
-                'capabilities': ["generic"],
-                'estimated_cost': 1.0,
-                'estimated_duration': 1.0,
-                'confidence': 0.8
+        except Exception as e:
+            self.logger.error(f"Plan adaptation failed: {str(e)}")
+            return None
+
+    def adapt_plan_based_on_learning(self, plan: Plan, learning_service: LearningService) -> Optional[Plan]:
+        """Use learning insights to adapt plan steps"""
+        if not plan or not plan.steps:
+            return None
+
+        try:
+            # Get relevant context
+            context = {
+                "goal": plan.goal,
+                "priority": plan.priority,
+                "deadline": getattr(plan, "deadline", None)
             }
-            self.bids[task_id][agent] = bid
-            
-        return self._evaluate_bids(task_id)
 
-    def _evaluate_bids(self, task_id: str) -> Dict[str, Any]:
-        """Evaluate received bids and make assignments."""
-        if task_id not in self.task_announcements:
-            return {'status': 'error', 'message': 'Invalid task ID'}
-            
-        bids = self.bids[task_id]
-        if not bids:
-            self.task_announcements[task_id]['status'] = 'failed'
-            return {'status': 'failed', 'message': 'No bids received'}
-            
-        # Simple selection - choose agent with lowest estimated cost
-        selected_agent, best_bid = min(bids.items(), 
-                                      key=lambda x: x[1]['estimated_cost'])
-        
-        self.assignments[task_id] = {
-            'agent': selected_agent,
-            'bid': best_bid,
-            'assignment_time': time.time()
-        }
-        
-        self.task_announcements[task_id]['status'] = 'assigned'
-        
-        return {
-            'status': 'assigned',
-            'agent': selected_agent,
-            'details': best_bid
-        }
+            # Have learning service score all methods
+            methods = [{
+                "id": step.action,
+                "parameters": step.parameters,
+                "preconditions": step.preconditions,
+                "effects": step.effects
+            } for step in plan.steps]
 
-# Example usage
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    
-    # Sample domain knowledge
-    domain = {
-        'actions': {
-            'play_music': {
-                'parameters': {'genre': 'str', 'volume': 'int'},
-                'preconditions': {'has_speakers', 'music_available'},
-                'effects': {'music_playing'},
-                'duration': 0.1,
-                'required_resources': ['speakers'],
-                'reliability': 0.95
-            },
-            'dim_lights': {
-                'preconditions': {'has_dimmable_lights'},
-                'effects': {'lights_dimmed'},
-                'duration': 0.5,
-                'required_resources': ['smart_lights'],
-                'reliability': 0.9
-            }
-        },
-        'resources': ['speakers', 'smart_lights'],
-        'agent_capabilities': {
-            'media_agent': ['play_music'],
-            'lighting_agent': ['dim_lights']
-        }
-    }
-    
-    # Initialize services
-    planner = PlanningService(domain)
-    coordinator = CoordinationProtocol(list(domain['agent_capabilities'].keys()))
-    
-    # Create and visualize a plan
-    plan = planner.create_plan(
-        goal="create_mood",
-        tags={"has_speakers", "has_dimmable_lights", "evening_time"},
-        available_resources=["speakers", "smart_lights"],
-        priority=0.8
-    )
-    
-    if plan:
-        print("\nGenerated Plan:")
-        for i, step in enumerate(plan.steps):
-            print(f"{i+1}. {step.action} (takes {step.duration}h)")
+            scored_methods = learning_service.schedule_method_selection(methods, context)
+
+            # Replace low-confidence steps with alternatives
+            confidence_threshold = learning_service.get_confidence_threshold(context)
+            new_steps = []
+
+            for i, step in enumerate(plan.steps):
+                scored_step = next(
+                    (m for m in scored_methods if m["id"] == step.action),
+                    None
+                )
+                
+                if not scored_step or scored_step["confidence"] < confidence_threshold:
+                    # Find alternative with higher confidence
+                    alternatives = [
+                        m for m in scored_methods 
+                        if m["confidence"] >= confidence_threshold
+                        and m["id"] != step.action
+                        and self._is_valid_alternative(m, step, plan)
+                    ]
+                    
+                    if alternatives:
+                        best_alt = alternatives[0]
+                        new_step = PlanStep(
+                            action=best_alt["id"],
+                            parameters=best_alt["parameters"],
+                            preconditions=best_alt["preconditions"],
+                            effects=best_alt["effects"],
+                            priority=step.priority
+                        )
+                        new_steps.append(new_step)
+                        continue
+
+                new_steps.append(step)
+
+            if new_steps != plan.steps:
+                return Plan(
+                    goal=plan.goal,
+                    steps=new_steps,
+                    priority=plan.priority,
+                    tags=plan.tags,
+                    success_probability=self._estimate_success_probability(new_steps)
+                )
+
+            return plan
+
+        except Exception as e:
+            self.logger.error(f"Plan adaptation failed: {str(e)}")
+            return None
+
+    def _is_valid_alternative(self, method: Dict, original_step: PlanStep, plan: Plan) -> bool:
+        """Check if method is valid alternative for original step"""
+        # Must provide similar effects
+        if not set(method["effects"]).issuperset(original_step.effects):
+            return False
+            
+        # Must not invalidate future steps
+        future_steps = plan.steps[plan.steps.index(original_step) + 1:]
+        simulated_tags = plan.tags | set(method["effects"])
         
-        planner.visualize_plan(plan)
+        for future_step in future_steps:
+            if not future_step.preconditions.issubset(simulated_tags):
+                return False
+                
+        return True
+
+    def adjust_search_depth(self, cpu_load: float, memory_available: float) -> None:
+        """Dynamically adjust search depth based on system resources"""
+        base_depth = self._get_max_search_depth()
         
-        # Test coordination
-        print("\nCoordinating task...")
-        result = coordinator.announce_task({
-            'action': 'play_music',
-            'parameters': {'genre': 'jazz', 'volume': 60}
-        })
-        print(f"Task assigned to: {result['agent']}")
+        # Reduce depth under high load
+        if cpu_load > 80:
+            base_depth = max(2, base_depth - 2)
+        elif cpu_load > 60:
+            base_depth = max(2, base_depth - 1)
+            
+        # Reduce depth if memory is constrained
+        if memory_available < 512:  # MB
+            base_depth = max(2, base_depth - 1)
+            
+        self._current_max_depth = base_depth
+        
+    def _get_max_search_depth(self) -> int:
+        """
+        Get maximum search depth based on hardware tier.
+        
+        Returns:
+            Maximum search depth (integer)
+        """
+        try:
+            from snippets.snippet_detect_hardware_tier import detect_hardware_tier, HardwareTier
+            
+            tier = detect_hardware_tier()
+            
+            if tier == HardwareTier.GARBAGE:
+                return 2
+            elif tier == HardwareTier.LOW_END:
+                return 3
+            elif tier == HardwareTier.MID_RANGE:
+                return 4
+            else:  # HIGH_END
+                return 5
+                
+        except Exception as e:
+            self.logger.error(f"Error determining max search depth: {str(e)}")
+            return 3  # Default to mid-range depth
+
+    def visualize_plan(self, plan: Plan, filename: str = "plan.html") -> None:
+        """Generate interactive visualization of plan structure"""
+        if not plan or not plan.steps:
+            return
+            
+        try:
+            net = Network(height="750px", width="100%", directed=True)
+            
+            # Add nodes for each step
+            for i, step in enumerate(plan.steps):
+                color = "#FFA07A" if step.status == PlanStatus.FAILED else "#98FB98"
+                label = f"{i+1}. {step.action}\n({step.duration}h)"
+                net.add_node(i, label=label, title=str(step.parameters), color=color)
+                
+                if i > 0:
+                    net.add_edge(i-1, i, width=2)
+                    
+            # Add goal node
+            net.add_node(
+                len(plan.steps),
+                label=f"GOAL: {plan.goal}",
+                color="#32CD32",
+                shape="diamond"
+            )
+            
+            if plan.steps:
+                net.add_edge(len(plan.steps)-1, len(plan.steps), width=3)
+                
+            net.show(filename)
+            
+        except Exception as e:
+            self.logger.error(f"Visualization failed: {str(e)}")

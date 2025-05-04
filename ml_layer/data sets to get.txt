@@ -1,0 +1,154 @@
+[
+  {
+    "name": "allenporter/home-assistant-datasets",
+    "description": "Collection of datasets (intents, states, etc.) for evaluating AI models within Home Assistant. Uses synthetic data generation.",
+    "category": "Intent/NLU",
+    "source_type": "GitHub",
+    "link": "https://github.com/allenporter/home-assistant-datasets",
+    "download_info": "Click green '<> Code' button -> 'Download ZIP'. Datasets are in subdirectories."
+  },
+  {
+    "name": "acon96/Home-Assistant-Requests",
+    "description": "Synthetic dataset (~35k examples) of user requests and corresponding Home Assistant service calls in JSON format.",
+    "category": "Intent/NLU",
+    "source_type": "Hugging Face",
+    "link": "https://huggingface.co/datasets/acon96/Home-Assistant-Requests",
+    "download_info": "Go to 'Files and versions' tab for direct file download, or use Hugging Face 'datasets' library."
+  },
+  {
+    "name": "French Smart-Home Voice Command Corpus (Research)",
+    "description": "Research paper discussing the creation of a synthetic French command corpus, highlighting the scarcity of such datasets.",
+    "category": "Intent/NLU",
+    "source_type": "Research Paper",
+    "link": "https://backoffice.biblio.ugent.be/download/8750184/8750192",
+    "download_info": "Paper describes the corpus, dataset itself may not be directly available."
+  },
+  {
+    "name": "xingkunliuxtracta/nlu_evaluation_data",
+    "description": "Dataset (~25k utterances) from conversational domains (including household scenarios) annotated with 68 intents and 18 scenarios for benchmarking NLU systems.",
+    "category": "Intent/NLU",
+    "source_type": "Hugging Face",
+    "link": "https://huggingface.co/datasets/xingkunliuxtracta/nlu_evaluation_data",
+    "download_info": "Go to 'Files and versions' tab for direct file download (CSV likely), or use Hugging Face 'datasets' library."
+  },
+  {
+    "name": "XLMRoberta Alexa Intents Classification (Model Info)",
+    "description": "Information about a multilingual model trained on >1M utterances for intent classification (including smart home), but not the dataset itself.",
+    "category": "Intent/NLU",
+    "source_type": "Dataloop AI",
+    "link": "https://dataloop.ai/library/model/qanastek_xlmroberta-alexa-intents-classification/",
+    "download_info": "Describes the model, dataset not directly provided."
+  },
+  {
+    "name": "MindMeld Home Assistant Blueprint (Structure/Examples)",
+    "description": "Documentation outlining a conversational AI app for home automation, detailing intents, entities, dialogue states, and example interactions.",
+    "category": "Conversational AI",
+    "source_type": "MindMeld Docs",
+    "link": "https://www.mindmeld.com/docs/blueprints/home_assistant.html",
+    "download_info": "Provides structure and examples, not a raw dataset file."
+  },
+  {
+    "name": "CIC IoT-DIAD 2024",
+    "description": "Network traffic features (packet and flow-based) from 105 IoT devices under benign and 7 attack categories (DDoS, DoS, Recon, etc.) for device ID and anomaly detection.",
+    "category": "IoT Traffic/Security",
+    "source_type": "UNB CIC",
+    "link": "https://www.unb.ca/cic/datasets/iot-diad-2024.html",
+    "download_info": "Look for download links/section on the page (may require agreement)."
+  },
+  {
+    "name": "RT-IoT2022",
+    "description": "Network traffic and system logs from real-time IoT infrastructure (ThingSpeak-LED, Wipro-Bulb, MQTT-Temp) including various attack scenarios (SSH Brute-Force, DDoS, Nmap).",
+    "category": "IoT Traffic/Security",
+    "source_type": "UCI ML Repository",
+    "link": "https://archive.ics.uci.edu/dataset/942/rt-iot2022",
+    "download_info": "Click 'Download' button on page or use 'ucimlrepo' Python library."
+  },
+  {
+    "name": "Smart Home Ontology (Research)",
+    "description": "Research papers discussing ontologies (structural models) for smart homes, devices, sensors, and activities (e.g., for ADL recognition).",
+    "category": "Ontology/Structure",
+    "source_type": "Research Paper",
+    "link": "https://www.researchgate.net/publication/259995904_An_ontology-based_approach_to_ADL_recognition_in_smart_homes",
+    "download_info": "Describes the ontology structure, ontology files might be available separately."
+  },
+  {
+    "name": "Home Assistant Developer Docs (Structure Info)",
+    "description": "Documentation explaining the structure of Home Assistant configuration (options.json) and entity/device registries (.storage files).",
+    "category": "Ontology/Structure",
+    "source_type": "Developer Docs",
+    "link": "https://developers.home-assistant.io/docs/entity_registry_index",
+    "download_info": "Describes data structure, not a dataset dump."
+  },
+  {
+    "name": "HA Community Scripts (Registry Manipulation)",
+    "description": "Community-provided scripts for manipulating Home Assistant registry entries (deleting, renaming), indicating how data can be accessed.",
+    "category": "Platform Specific",
+    "source_type": "Home Assistant Community",
+    "link": "https://community.home-assistant.io/t/6-routines-to-delete-rename-move-devices-entities-and-their-corresponding-registry-entries-data-and-metadata/755476",
+    "download_info": "Provides scripts, not a dataset."
+  },
+  {
+    "name": "SmartAid Dataset (SmartThings)",
+    "description": "Dataset for action planning in SmartThings, defining capabilities, commands, states for various devices (TV, Bulb, etc.).",
+    "category": "Platform Specific",
+    "source_type": "GitHub / Research Paper",
+    "link": "https://github.com/SmartAid-IoT/SmartAid",
+    "download_info": "Dataset likely available in the GitHub repository."
+  },
+  {
+    "name": "SmartSense Dataset (SmartThings)",
+    "description": "SmartThings action logs (sequences of device controls) and routines from users in 4 countries, for action recommendation.",
+    "category": "Platform Specific",
+    "source_type": "GitHub / Research Paper",
+    "link": "https://github.com/snudatalab/smartsense",
+    "download_info": "Dataset files (.pkl, .txt) available in the GitHub repository."
+  },
+  {
+    "name": "Smart Speaker Command Dataset (Alexa)",
+    "description": "'Hey Alexa' voice commands (.wav files) including smart home tasks, from diverse speakers.",
+    "category": "Platform Specific",
+    "source_type": "Figshare (University of Rochester)",
+    "link": "https://rochester.figshare.com/articles/dataset/Smart_Speaker_Command_Dataset/26417548",
+    "download_info": "Direct download link for .zip archive available on the page."
+  },
+  {
+    "name": "SDHAR-HOME Dataset",
+    "description": "Multi-user human activity recognition dataset using ambient sensors (motion, contact, temp/humidity, vibration, power, light) and beacon positioning.",
+    "category": "Activity Recognition",
+    "source_type": "Research Paper (MDPI)",
+    "link": "https://www.mdpi.com/1424-8220/22/21/8109",
+    "download_info": "Paper describes dataset; access may require contacting authors or finding supplementary materials."
+  },
+  {
+    "name": "Multi-sensor dataset of human activities (Mendeley)",
+    "description": "Single-user smart home activity dataset using PIR, force sensors, reed switches, light sensors, temp/humidity, and smart plugs.",
+    "category": "Activity Recognition",
+    "source_type": "Mendeley Data",
+    "link": "https://data.mendeley.com/datasets/t9n68ykfk3/1",
+    "download_info": "Download usually available via 'Download all' or individual file links on the page."
+  },
+  {
+    "name": "Predictive User Behavior (Research)",
+    "description": "Research papers discussing methods (often LLM-based) for predicting next user actions in smart homes/vehicles based on historical logs.",
+    "category": "Predictive/Multi-Turn",
+    "source_type": "Research Paper (AAAI, arXiv)",
+    "link": "https://ojs.aaai.org/index.php/AAAI/article/view/32059/34214",
+    "download_info": "Describes methodologies; specific datasets used might be cited but not directly linked."
+  },
+  {
+    "name": "Multi-Turn Conversational AI (Info/Methods)",
+    "description": "Resources discussing challenges and techniques (flowgraphs, path sampling) for creating multi-turn conversational datasets, relevant for complex interactions.",
+    "category": "Predictive/Multi-Turn",
+    "source_type": "Blog/Article",
+    "link": "https://www.flow-ai.com/blog/automating-test-set-creation-for-conversational-ai-agents",
+    "download_info": "Describes methods, not a specific dataset."
+  },
+  {
+    "name": "Smart* Dataset",
+    "description": "Detailed energy (circuits, meters, switches), environmental (temp, humidity), and operational (furnace, door, motion) data from 3 real homes, plus solar/microgrid data.",
+    "category": "Energy/Sustainability",
+    "source_type": "UMass Trace Repository",
+    "link": "https://traces.cs.umass.edu/docs/traces/smartstar/",
+    "download_info": "Direct download links for .tar.gz files available on the page for each home/data type."
+  }
+]
