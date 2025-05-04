@@ -1,0 +1,68 @@
+ggfai_framework/
+├── core/                       # Core non-domain-specific logic
+│   ├── tag_registry.py         # Central tag validation, routing, management (pruning, compression)
+│   └── run_with_grace.py       # Circuit breaker/graceful execution utility
+│
+├── entry_points/               # Interfaces for system input/output
+│   ├── voice.py                # Voice input processing (SpeechRecognition) -> Renamed from deepseek_voice.py
+│   └── web_app.py              # FastAPI web server, WebSocket endpoint, Ollama interaction
+│
+├── ml_layer/                   # Machine learning, planning, and agent logic
+│   ├── intent_engine.py        # Core intent processing, context/error monitoring (placeholder?)
+│   ├── model_adapter.py        # **NEW** Adapts various model outputs (GGUF, ONNX, TFLite) to GGFAI tags
+│   └── agent/                  # Dynamic agent components
+│       ├── planning_service.py # HTN/A* planning, uses trackers
+│       ├── learning.py         # UCB1 Bandit learning, updates feature_tracker Q-values
+│       ├── coordinator.py      # Multi-agent task bidding/claiming, uses trackers
+│       ├── generate_explanation.py # Generates plan narratives & visualizations
+│       └── tag_analyzer.py     # Prioritizes tags based on context, success rates
+│
+├── trackers/                   # Specialized storage for different tag types
+│   ├── analytics_tracker.py    # Logs system events, performs failure analysis
+│   ├── intent_tracker.py       # **NEW (Impl)** Stores/manages intent tags
+│   ├── feature_tracker.py      # **NEW (Impl)** Stores/manages feature tags (capabilities, status, Q-values)
+│   └── context_tracker.py      # **NEW (Impl)** Stores/manages context tags (environment, task claims)
+│
+├── resource_management/        # Components for monitoring and managing system resources
+│   ├── adaptive_scheduler.py   # Hardware-aware task scheduling, backpressure
+│   ├── hardware_shim.py        # Hardware tier detection, capability mapping, telemetry
+│   ├── proactive_anomaly_detection.py # Statistical anomaly detection (spikes, leaks)
+│   └── resource_predictor.py   # Resource forecasting (CPU/Mem) using ARIMA/LSTM
+│   # (resource_profile_class.py) # (Mentioned in docs/API, assumed for predictor)
+│
+├── config/                     # Configuration files
+│   └── devices.json            # Basic device definitions
+│   # (ai_prompt.txt)           # (Mentioned in docs, not uploaded)
+│
+├── data/                       # Training/evaluation data
+│   └── intents_train.csv       # Sample training data for intent classification
+│   # (intents_test.csv)        # (Mentioned in training script, not uploaded)
+│
+├── scripts/                    # Development/utility scripts
+│   ├── train_intent_classifier.py # Script to train intent model (ONNX export)
+│   └── train_tinyllama.py      # Script to fine-tune/quantize TinyLlama (GGUF export)
+│
+├── static/                     # Web application static files
+│   ├── ggfai_ui.js             # Frontend JavaScript for dashboard interaction
+│   └── dashboard.html          # Main HTML template for the web UI
+│   # (style.css / *.css)       # (Mentioned/Implied, not uploaded)
+│
+├── tests/                      # Test suite
+│   └── testing.py              # Comprehensive unit/integration tests -> Renamed from grok3_testing.py
+│
+├── snippets/                   # Reusable code examples/utilities
+│   # (snippet_*.py files)      # (Mentioned in docs/code, not uploaded)
+│
+├── docs/                       # Project documentation
+│   ├── README.txt              # Main project overview (as README.md)
+│   ├── architecture.txt        # Architecture overview (as architecture.md)
+│   ├── api_reference.txt       # API details (as api_reference.md)
+│   └── Tech Overview.html      # High-level technical concepts document
+│   # (setup_guide.md)          # (Mentioned, not uploaded)
+│   # (contributing.md)         # (Mentioned, not uploaded)
+│   # (deepseek_lair.md)        # (Mentioned, not uploaded)
+│
+└── tree.txt                    # This project structure file
+# (.gitignore)                  # (Standard file, not uploaded)
+# (LICENSE)                     # (Standard file, not uploaded)
+# (requirements.txt)            # (Standard file, not uploaded)

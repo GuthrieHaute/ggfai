@@ -1,0 +1,45 @@
+# GGFAI Framework API Reference
+
+## Entry Points
+- **voice.py**: `process_voice_input(audio_data: bytes) -> Optional[Dict]`
+  - Processes audio into intents (e.g., `{intent: play_music}`).
+- **text.py**: `process_text_input(text: str) -> Optional[Dict]`
+  - Parses text using spaCy (e.g., `{intent: cheer_up}`).
+- **web_app.py**: FastAPI endpoints (`/`, `/ws`)
+  - Serves UI and processes WebSocket intents.
+
+## ML Layer
+- **intent_engine.py**: `process_intent(input_data: Dict, source: str) -> Optional[Dict]`
+  - Core intent processing with spaCy, Rasa, Transformers, Ollama.
+- **planning_service.py**: `plan_action(goal_data: Dict, context: Dict) -> Tuple[Optional[str], Optional[str], str]`
+  - Selects features using tag matching/heuristic search.
+- **learning.py**: `update_success_rates(lookback_limit: int) -> int`
+  - Updates feature success rates via Q-learning.
+- **coordinator.py**: `claim_task(agent_id: str, goal_id: str) -> bool`
+  - Manages multi-agent task claiming.
+- **generate_explanation.py**: `generate_narrative(trace_id: str) -> str`
+  - Creates user-friendly decision narratives.
+- **tag_analyzer.py**: `suggest_compressed_tags(lookback_limit: int) -> List[Dict]`
+  - Proposes compressed tags based on patterns.
+
+## Trackers
+- **intent_tracker.py**: `IntentTracker.add_tag(tag: Dict) -> str`, `get_tags() -> List[Dict]`
+  - Manages intent tags.
+- **feature_tracker.py**: `FeatureTracker.add_tag(tag: Dict) -> str`, `get_tags() -> List[Dict]`
+  - Tracks feature capabilities.
+- **context_tracker.py**: `ContextTracker.add_tag(tag: Dict) -> str`, `get_tags() -> List[Dict]`
+  - Stores context tags.
+- **analytics_tracker.py**: `AnalyticsTracker.add_tag(tag: Dict) -> str`, `get_tags() -> List[Dict]`
+  - Logs events and patterns.
+
+## Core
+- **tag_registry.py**: `TagRegistry.register_tag(tag: Dict, tracker: str) -> Optional[str]`, `manage_tags(tags: List[Dict]) -> List[Dict]`
+  - Routes and validates tags.
+
+## Resource Management
+- **resource_predictor.py**: `ResourcePredictor.predict_resource_demand(resource_profile: ResourceProfile, prediction_steps: int, confidence_level: float) -> Dict[str, PredictionResult]`
+  - Forecasts resource demands.
+- **resource_profile_class.py**: `ResourceProfile.estimate_resources(context: Dict, input_params: Dict) -> Dict[ResourceType, float]`
+  - Profiles feature resource needs.
+- **proactive_anomaly_detection.py**: `ProactiveAnomalyDetector.run_detection_cycle() -> List[Dict]`
+  - Detects performance anomalies.

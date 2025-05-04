@@ -1,0 +1,111 @@
+# GGFAI Framework Setup Guide
+
+## Prerequisites
+- **Python**: 3.8+.
+- **pip**: For dependencies.
+- **Ollama**: For GGUF model inference (optional).
+- **Models**: Pre-trained Rasa/Transformer models in `ml_layer/models/` (optional).
+
+## Installation
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/username/ggfai_framework.git
+   cd ggfai_framework
+   ```
+2. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **Run Ollama Server** (if using GGUF models):
+   ```bash
+   ollama serve
+   ```
+4. **Verify Setup**:
+   ```bash
+   pytest tests/
+   ```
+
+## Running the Web App
+1. **Start the Web App**:
+   ```bash
+   python entry_points/web_app.py
+   ```
+2. **Access the UI**:
+   Open `http://localhost:8000` to:
+   - Input intents (e.g., “Play music”).
+   - Select GGUF models via Ollama.
+   - View tag dashboards and agent narratives.
+
+## Development
+1. **Entry Points**:
+   - Implement `voice.py` with SpeechRecognition.
+   - Implement `text.py` with spaCy.
+   - Add new slots (e.g., `bci.py`) in `entry_points/`.
+2. **Intent Engine**:
+   - Enhance `intent_engine.py` with spaCy, Rasa, Transformers, and Ollama.
+   - Train models and save to `ml_layer/models/`.
+3. **Dynamic Agents**:
+   - Implement `planning_service.py` for tag matching, A*, or HTN planning.
+   - Add `learning.py` for Q-learning from `analytics_tracker.py`.
+   - Create `coordinator.py` for multi-agent coordination.
+   - Develop `generate_explanation.py` for narratives.
+   - Use `tag_analyzer.py` for tag evolution.
+4. **Trackers**:
+   - Add storage logic to `intent_tracker.py`, `feature_tracker.py`, etc.
+   - Implement DeepSeek’s measures in `tag_registry.py` (e.g., pruning, compression).
+5. **Resource Management**:
+   - Use `resource_predictor.py` for demand forecasting.
+   - Profile features with `resource_profile_class.py`.
+   - Detect anomalies with `proactive_anomaly_detection.py`.
+6. **Web App**:
+   - Extend `web_app.py` for tag suggestions, narratives, and resource stats.
+   - Optimize WebSocket handling for real-time intents.
+7. **AI Prompt**:
+   - Customize `ai_prompt.txt` for agent behaviors (e.g., `MAX_RETRIES=3`).
+8. **Tests**:
+   - Write tests in `tests/` (e.g., `test_planning.py`).
+   - Run with `pytest`.
+
+## Dynamic Agent Setup
+1. **Planning**:
+   - Add tag matching in `intent_engine.py`.
+   - Implement A*/HTN in `planning_service.py`.
+2. **Learning**:
+   - Update Q-values in `learning.py`.
+   - Propose tags in `tag_analyzer.py`.
+3. **Coordination**:
+   - Use `context_tracker.py` for communication.
+   - Implement `coordinator.py` for resource locking.
+4. **Error Handling**:
+   - Add retries and alternatives in `intent_engine.py`.
+   - Monitor `context_tracker.py` for critical changes.
+5. **Explainability**:
+   - Log decisions in `analytics_tracker.py`.
+   - Generate narratives with `generate_explanation.py`.
+6. **Resource Management**:
+   - Log usage in feature slots.
+   - Enforce budgets in `intent_engine.py`.
+
+## Optimization for Low-End Hardware
+- **GGUF Models**:
+  - Use Q5-Q8 quantization in `intent_engine.py` (e.g., Llama-2-7B-Chat-GGUF).
+  - Enable input batching and speculative decoding.
+  - Configure CPU threads via `resource_predictor.py`.
+- **Web App**:
+  - Minimize HTTP requests in `static/style.css`, `static/app.js`.
+  - Compress assets and enable caching in `web_app.py`.
+- **Validation**:
+  - Log metrics in `analytics_tracker.py` using `resource_profile_class.py`.
+
+## Troubleshooting
+- **Dependencies**: Verify `requirements.txt` installation.
+- **Web App**: Check logs for port conflicts in `web_app.py`.
+- **Models**: Ensure `ml_layer/models/` compatibility.
+- **Agents**: Enable debug logging in `intent_engine.py` (`--log-level DEBUG`).
+
+## Next Steps
+- Implement `voice.py` with SpeechRecognition.
+- Train Rasa models for `ml_layer/models/`.
+- Enhance `planning_service.py` with A* search.
+- Test on diverse hardware (Raspberry Pi, cloud).
+- Join #GGF_AI on X for collaboration.

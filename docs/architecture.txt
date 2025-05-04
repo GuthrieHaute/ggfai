@@ -1,0 +1,107 @@
+# GGFAI Framework Architecture
+
+## Overview
+The **Grok & Guthrie Framework for AI (GGFAI)** is a modular, scalable framework for building custom home AI systems with dynamic agents. It runs on any hardware, from Raspberry Pi to high-end servers, supporting noob-friendly deployment via `web_app.py` and pro-level customization. Its core relies on a tag-centric architecture using four specialized trackers (`Intent`, `Feature`, `Context`, `Analytics`) coordinated by a central `TagRegistry`. This enables emergent coordination, hardware adaptability, and resilience. Rated **9.7/10** by Grok, **9.5/10** by DeepSeek, and “robust” by Gemini (May 2025).
+
+## Components
+
+* **Entry Points** (`entry_points/`):
+    * Purpose: Capture multi-modal inputs (voice, text, sensors, etc.) and present outputs.
+    * Files: `voice.py`, `web_app.py`, (Potentially `text.py`, `sensors.py`, etc.)
+    * Example: `web_app.py` provides a FastAPI/WebSocket interface; `voice.py` handles speech recognition.
+
+* **ML Layer** (`ml_layer/`):
+    * Purpose: Core AI processing, including intent understanding, planning, learning, and model interfacing.
+    * Files:
+        * `intent_engine.py`: Processes raw inputs into structured intents (potentially leveraging `ModelAdapter`). Monitors context/errors.
+        * `model_adapter.py`: **NEW** Provides a unified interface (`predict`, `to_ggfai_tag`) to interact with various ML models (GGUF via `llama-cpp`, ONNX via `onnxruntime`, TFLite). Converts model outputs into standard GGFAI `Tag` objects.
+        * `agent/planning_service.py`: Performs HTN/A* planning based on goals (intents) and current state (from Context/Feature trackers). Selects features/actions.
+        * `agent/learning.py`: Implements reinforcement/bandit learning (UCB1) to optimize feature selection based on success, updating Q-values in `FeatureTracker`.
+        * `agent/coordinator.py`: Manages multi-agent interactions, task claiming/bidding, using `ContextTracker` for claims and `FeatureTracker` for resource status/locking.
+        * `agent/generate_explanation.py`: Creates narratives and visualizations explaining agent decisions, using data from planning and trackers.
+        * `agent/tag_analyzer.py`: Ranks tags based on priority, success rate, and context, aiding decision-making.
+
+* **Trackers** (`trackers/`):
+    * Purpose: Specialized storage and management for different categories of tags.
+    * Files:
+        * `intent_tracker.py`: **(Implemented)** Stores and manages historical and active intent tags (user/system goals). Provides methods for querying by category, priority. Handles archiving.
+        * `feature_tracker.py`: **(Implemented)** Stores and manages feature tags representing device/component capabilities, states (e.g., `on`/`off`, `busy`), and learned parameters (e.g., Q-values for actions).
+        * `context_tracker.py`: **(Implemented)** Stores and manages context tags representing environmental state, system status, or coordination information (e.g., `time_of_day`, `user_present`, `task_claim`).
+        * `analytics_tracker.py`: Logs system events, errors, and performance metrics. Performs automated failure correlation analysis.
+
+* **Core** (`core/`):
+    * Purpose: Foundational, non-domain-specific logic and utilities.
+    * Files:
+        * `tag_registry.py`: Central hub for tag validation, routing tags to appropriate trackers, managing tag lifecycle (pruning, compression), and similarity detection.
+        * `run_with_grace.py`: Implements the Circuit Breaker pattern for resilient function execution with retries and fallbacks.
+
+* **Resource Management** (`resource_management/`):
+    * Purpose: Monitor system resources and adapt behavior accordingly.
+    * Files:
+        * `hardware_shim.py`: Detects hardware tier, exposes capabilities, provides telemetry.
+        * `adaptive_scheduler.py`: Schedules tasks based on priority, load, and hardware tier; applies backpressure.
+        * `resource_predictor.py`: Forecasts CPU/memory usage using ARIMA/LSTM models.
+        * `proactive_anomaly_detection.py`: Detects statistical anomalies (spikes, leaks) in system metrics.
+        * (`resource_profile_class.py`): (Implied) Defines how to estimate resource needs for features/tasks.
+
+* **Configuration & Data** (`config/`, `data/`):
+    * Purpose: Store static configuration and training data.
+    * Files: `devices.json`, `intents_train.csv`, (`ai_prompt.txt`, etc.)
+
+* **Scripts** (`scripts/`):
+    * Purpose: Development utilities for training/preparing models.
+    * Files: `train_intent_classifier.py`, `train_tinyllama.py`.
+
+* **Static** (`static/`):
+    * Purpose: Assets for the web application.
+    * Files: `dashboard.html`, `ggfai_ui.js`.
+
+* **Tests** (`tests/`):
+    * Purpose: Unit and integration tests.
+    * Files: `testing.py`.
+
+* **Docs** (`docs/`):
+    * Purpose: Project documentation.
+    * Files: `README.txt`, `architecture.txt`, `api_reference.txt`, `Tech Overview.html`.
+
+
+## Dynamic Agent Architecture
+(Content remains largely the same as original `architecture.txt`, but interpretations are now grounded in implemented trackers)
+Dynamic agents (`planning_service.py`, `learning.py`, `coordinator.py`, `generate_explanation.py`) enable goal-driven, adaptive behavior:
+* **Planning**: Uses `ContextTracker` for current state and `FeatureTracker` for available actions/resources. HTN/Heuristic search selects best actions.
+* **Learning**: Updates Q-values or success rates stored in `FeatureTracker` based on outcomes logged in `AnalyticsTracker`.
+* **Coordination**: Uses `ContextTracker` for task claims (`task_claim` tags) and `FeatureTracker` for resource status (`busy` tag). Implements bidding/negotiation.
+* **Explainability**: Uses logs from `AnalyticsTracker` and plan details to generate narratives/visualizations.
+
+
+## Data Flow Example (Updated)
+1.  **Input**: User says "Dim the lights" via `voice.py`.
+2.  **Intent Processing**: `voice.py` creates basic text structure. `intent_engine.py` (likely using `model_adapter.py` with an intent classifier model) generates `{intent: dim_lights, priority: 0.8, ...}` tag.
+3.  **Tag Routing**: `tag_registry.py` validates the tag and routes it to `intent_tracker.py`.
+4.  **Context Update**: Relevant context (e.g., `{context: time_of_day=night}`) is added/updated in `context_tracker.py`.
+5.  **Planning**: `planning_service.py` queries `intent_tracker.py` for the goal (`dim_lights`), `context_tracker.py` for state (`night`), and `feature_tracker.py` for suitable features (e.g., `smart_bulb` with capability `lighting`). It selects `smart_bulb` action.
+6.  **Coordination**: `coordinator.py` might check/set `smart_bulb` status in `feature_tracker.py` to `busy`.
+7.  **Action**: Agent invokes the feature slot corresponding to `smart_bulb`. Action result logged in `analytics_tracker.py`. Q-value potentially updated in `feature_tracker.py` via `learning.py`.
+8.  **Feedback**: `web_app.py` might display status or explanation from `generate_explanation.py`.
+
+
+## Extensibility
+(Remains similar, now more concrete)
+* Add entry points (e.g., `text.py`).
+* Train models using `scripts/` and integrate via `model_adapter.py`.
+* Define new tag categories/types handled by `tag_registry.py` and potentially new specialized trackers.
+* Extend `planning_service.py` methods.
+
+## Safety Features
+(Remains similar, now grounded in specific components)
+* **Slots**: Isolate entry point logic.
+* **Tag Registry**: Validates tags, manages lifecycle (pruning/compression).
+* **Resource Management**: Anomaly detection, prediction, adaptive scheduling.
+* **Resilience**: `run_with_grace.py` circuit breaker.
+* **Agents**: Coordination protocols (locking in `FeatureTracker`, claims in `ContextTracker`), error handling within planning/execution.
+
+## Scalability
+(Remains similar)
+* Runs on diverse hardware via `hardware_shim.py` and adaptive components.
+* Handles tags via `tag_registry.py` lifecycle management.
+* Modular design supports adding features/agents.
