@@ -1,6 +1,50 @@
 # GGFAI Framework
 
-The GGFAI Framework is a modular, scalable framework for building custom home AI systems. It supports deployment on a wide range of hardware, from low-resource devices like Raspberry Pi to high-performance servers. Designed for accessibility, it enables beginners to deploy AI systems using a web-based interface, while offering advanced customization for experienced developers. The framework uses predefined slots, four tag-based trackers, and robust tag management to ensure safety, scalability, and maintainability. It integrates with GGUF models via Ollama for efficient local inference.
+# GGFAI Framework: Grok & Guthrie - Good Game!
+
+The **(GGFAI)** is the ultimate standard for custom home AI, running on any hardware from Raspberry Pi to high-end servers. Noobs deploy easily via a web app; pros customize extensively. Predefined slots, four tag trackers, and DeepSeek's tag management ensure scalability, safety, and a chaos-free experience. Supports GGUF models via Ollama for efficient local inference.
+
+## Why GGFAI?
+- **Intent-Driven**: Captures the "why" behind inputs (e.g., "I'm cold" → `{intent: warm_room}`).
+- **Hardware-Agnostic**: Runs on anything—old phones, toasters, or cloud servers.
+- **Noob-Friendly**: Web app and prebuilt slots require no library knowledge.
+- **Pro Power**: Custom inputs, models, and edge/cloud deployment.
+- **Bulletproof-ish**: Slots, trackers, and DeepSeek's measures prevent chaos.
+
+## Features
+- **Modular Slots**: Entry points for voice (`voice.py`), text (`text.py`), sensors (`sensors.py`), gestures (`gesture.py`), VR (`vr.py`), and web app (`web_app.py`).
+- **Intent Engine**: Uses spaCy, Rasa, Transformers, and SpeechRecognition in `intent_engine.py` for robust intent processing.
+- **Dynamic Agents**: Planning (`planning_service.py`), learning (`learning.py`), coordination (`coordinator.py`), and explainability (`generate_explanation.py`).
+- **Tag Trackers**: Intent (`intent_tracker.py`), Feature (`feature_tracker.py`), Context (`context_tracker.py`), and Analytics (`analytics_tracker.py`) with DeepSeek's taxonomy.
+- **Resource Management**: Predictive analytics (`resource_predictor.py`, `proactive_anomaly_detection.py`) and profiling (`resource_profile_class.py`).
+- **Web App**: Browser UI in `web_app.py` for intents, GGUF model selection, and tag dashboards.
+- **Ollama Integration**: Dynamic GGUF model loading in `intent_engine.py`.
+
+## Getting Started
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/username/ggfai_framework.git
+   cd ggfai_framework
+   ```
+2. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **Run Ollama Server** (for GGUF models):
+   ```bash
+   ollama serve
+   ```
+4. **Run the Web App**:
+   ```bash
+   python entry_points/web_app.py
+   ```
+5. **Access the UI**:
+   Open `http://localhost:8000` to input intents, select GGUF models, and view tag dashboards.
+
+## License
+AGPL3.0
+
+**Good Game, bro! Let's build the future of home AI!**
 
 ## Features
 - **Modular Input Slots**: Predefined entry points for capturing user inputs, including voice (`voice.py`), text (`text.py`), sensors (`sensors.py`), gestures (`gesture.py`), VR (`vr.py`), biometrics (`biometric.py`), external data (`external.py`), and a web interface (`web_app.py`).
