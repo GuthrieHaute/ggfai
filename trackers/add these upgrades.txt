@@ -1,0 +1,45 @@
+2. Instrumentation Points
+In intent_tracker.py
+python
+def add_tag(self, tag: Tag) -> str:
+    if "required_features" in tag.metadata:  # Log intent→feature links
+        for feat in tag.metadata["required_features"]:
+            REL_LOGGER.log_relationship(
+                source_type="intent",
+                source_id=tag.name,
+                target_type="feature",
+                target_id=feat,
+                rel_type=RelationshipType.INTENT_FEATURE,
+                weight=tag.priority
+            )
+    # ... existing code ...
+In context_tracker.py
+python
+def add_tag(self, tag: Tag) -> str:
+    if tag.name.startswith("context_"):  # Log context→intent links
+        active_intents = INTENT_TRACKER.get_current_priority_intents()
+        for intent in active_intents:
+            REL_LOGGER.log_relationship(
+                source_type="context",
+                source_id=tag.name,
+                target_type="intent",
+                target_id=intent.name,
+                rel_type=RelationshipType.CONTEXT_INTENT,
+                weight=intent.priority * 0.5  # Context has half weight
+            )
+    # ... existing code ...
+In feature_tracker.py
+python
+def set_status(self, feature_name: str, status: str):
+    if status == "active":  # Log feature→context activation
+        current_ctx = CONTEXT_TRACKER.get_all_active()
+        for ctx_name, ctx in current_ctx.items():
+            REL_LOGGER.log_relationship(
+                source_type="feature",
+                source_id=feature_name,
+                target_type="context",
+                target_id=ctx_name,
+                rel_type=RelationshipType.FEATURE_CONTEXT,
+                weight=1.0
+            )
+    # ... existing code ...
