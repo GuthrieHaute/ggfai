@@ -1,0 +1,37 @@
+{
+  "yolo_models": {
+    "default": {
+      "model_variant": "yolov8n",
+      "path": "ml_layer/models/yolov8n.pt",
+      "hardware_tiers": ["DUST", "GARBAGE", "LOW_END"],
+      "enabled": true
+    },
+    "person_recognition": {
+      "model_variant": "yolov8m",
+      "path": "ml_layer/models/person_recognition.pt",
+      "hardware_tiers": ["MID_END", "HIGH_END"],
+      "cameras": ["camera_living_room", "camera_doorway"],
+      "enabled": true
+    },
+    "engineering_lab": {
+      "model_variant": "yolov8m",
+      "path": "ml_layer/models/lab_person_recognition.pt",
+      "hardware_tiers": ["MID_END", "HIGH_END"],
+      "quantized_path": "ml_layer/models/lab_person_recognition.tflite",
+      "quantized_tiers": ["DUST", "GARBAGE", "LOW_END"],
+      "enabled": false
+    },
+    "art_studio": {
+      "model_variant": "yolov8m",
+      "path": "ml_layer/models/art_studio_recognition.pt",
+      "hardware_tiers": ["MID_END", "HIGH_END"],
+      "enabled": false
+    },
+    "sports_referee": {
+      "model_variant": "yolov8l",
+      "path": "ml_layer/models/sports_referee.pt",
+      "hardware_tiers": ["HIGH_END"],
+      "enabled": false
+    }
+  }
+}
