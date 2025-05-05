@@ -1,74 +1,168 @@
-/* Filepath: static/style.css */
-/* Dark theme base styles */
-:root {
-    --bg-dark: #1a1a1a;
-    --bg-darker: #121212;
-    --text-light: #f0f0f0;
-    --text-lighter: #ffffff;
-    --accent-color: #4a8fe7;
-    --accent-hover: #3a7bd5;
-    --border-color: #333333;
+/* GGFAI Dashboard - Bootstrap Edition Custom Styles */
+
+/* Custom styles to enhance Bootstrap */
+.main-narrative {
+    font-size: 1.1rem;
+    line-height: 1.5;
 }
 
-body {
-    background-color: var(--bg-dark);
-    color: var(--text-light);
-    font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    margin: 0;
-    padding: 0;
-    line-height: 1.6;
+/* Tag visualization container */
+#tag-viz-container {
+    height: 500px;
+    width: 100%;
+    position: relative;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
 }
 
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
+/* Explanation visualization */
+.explanation-viz {
+    height: 300px;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
 }
 
-/* Model selector styles */
-.model-selector {
-    background-color: var(--bg-darker);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
+/* Pulse animation for recording button */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 107, 107, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 107, 107, 0);
+    }
 }
 
-/* Intent visualization */
-#intent-viz {
-    background-color: var(--bg-darker);
-    border-radius: 8px;
-    padding: 15px;
-    min-height: 300px;
-    margin-bottom: 20px;
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
 }
 
-/* Resource widgets */
-.resource-widget {
-    background-color: var(--bg-darker);
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
+.status-active {
+    background-color: #8ac926;
 }
 
-/* Floating action button */
-.fab {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    width: 60px;
-    height: 60px;
-    background-color: var(--accent-color);
+.status-inactive {
+    background-color: #aaaaaa;
+}
+
+.status-error {
+    background-color: #ff6b6b;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #tag-viz-container {
+        height: 400px;
+    }
+    
+    .explanation-viz {
+        height: 250px;
+    }
+}
+
+/* Dark mode enhancements */
+.sidebar[data-background-color="dark"] .nav-secondary .nav-item a p,
+.sidebar[data-background-color="dark"] .nav-secondary .nav-item a i {
+    color: #f0f0f0;
+}
+
+.sidebar[data-background-color="dark"] .nav-secondary .nav-item.active a p,
+.sidebar[data-background-color="dark"] .nav-secondary .nav-item.active a i {
+    color: #4a8fe7;
+}
+
+/* Custom scrollbar for visualization containers */
+#tag-viz-container::-webkit-scrollbar,
+.explanation-viz::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#tag-viz-container::-webkit-scrollbar-track,
+.explanation-viz::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+#tag-viz-container::-webkit-scrollbar-thumb,
+.explanation-viz::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+#tag-viz-container::-webkit-scrollbar-thumb:hover,
+.explanation-viz::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Microphone button animation */
+#mic-btn.btn-danger {
+    animation: pulse 1.5s infinite;
+}
+
+/* Card title emphasis */
+.card-title {
+    font-weight: 600;
+}
+
+/* Enhance accordion styling */
+.accordion-button:not(.collapsed) {
+    background-color: rgba(74, 143, 231, 0.1);
+    color: #4a8fe7;
+}
+
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.25rem rgba(74, 143, 231, 0.25);
+}
+
+/* Enhance notification styling */
+.alert-success {
+    background-color: #4ecdc4;
+}
+
+.alert-danger {
+    background-color: #ff6b6b;
+}
+
+.alert-warning {
+    background-color: #ffe66d;
+}
+
+.alert-info {
+    background-color: #4a8fe7;
+}
+
+/* Voice settings styles */
+.voice-settings-icon {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #4a8fe7;
     color: white;
     border-radius: 50%;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    transition: background-color 0.3s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: all 0.2s ease;
 }
 
-.fab:hover {
-    background-color: var(--accent-hover);
+.voice-settings-icon:hover {
+    transform: scale(1.1);
+    background: #2980b9;
+}
+
+#mic-btn {
+    position: relative;
 }

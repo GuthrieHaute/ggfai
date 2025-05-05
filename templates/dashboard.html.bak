@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>GGFAI Dashboard</title>
+    <meta
+      content="width=device-width, initial-scale=1.0, shrink-to-fit=no"
+      name="viewport"
+    />
+    <meta name="api-key" content="{{ api_key }}" />
+    <meta name="debug-mode" content="{{ 'true' if debug else 'false' }}" />
+    <link
+      rel="icon"
+      href="/static/assets/img/kaiadmin/favicon.ico"
+      type="image/x-icon"
+    />
+
+    <!-- Fonts and icons -->
+    <script src="/static/assets/js/plugin/webfont/webfont.min.js"></script>
+    <script>
+      WebFont.load({
+        google: { families: ["Public Sans:300,400,500,600,700"] },
+        custom: {
+          families: [
+            "Font Awesome 5 Solid",
+            "Font Awesome 5 Regular",
+            "Font Awesome 5 Brands",
+            "simple-line-icons",
+          ],
+          urls: ["/static/assets/css/fonts.min.css"],
+        },
+        active: function () {
+          sessionStorage.fonts = true;
+        },
+      });
+    </script>
+
+    <!-- External libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.5/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/javascript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/bash.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="/static/assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="/static/assets/css/plugins.min.css" />
+    <link rel="stylesheet" href="/static/assets/css/kaiadmin.min.css" />
+    <link rel="stylesheet" href="/static/style.css" />
+    
+    <style>
+      /* Chat interface styles */
+      .chat-container {
+        height: 500px;
+        display: flex;
+        flex-direction: column;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      }
+      
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background-color: #f8f9fa;
+      }
+      
+      .chat-input-container {
+        display: flex;
+        padding: 15px;
+        background-color: #fff;
+        border-top: 1px solid rgba(0,0,0,0.1);
+      }
+      
+      .chat-input {
+        flex: 1;
+        border-radius: 20px;
+        padding: 10px 15px;
+        border: 1px solid #ddd;
+        resize: none;
+        max-height: 120px;
+        overflow-y: auto;
+      }
+      
+      .chat-send-btn {
+        margin-left: 10px;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .message {
+        margin-bottom: 15px;
+        max-width: 80%;
+        animation: fadeIn 0.3s ease;
+      }
+      
+      .message-user {
+        margin-left: auto;
+        background-color: #4a8fe7;
+        color: white;
+        border-radius: 18px 18px 0 18px;
+        padding: 10px 15px;
+      }
+      
+      .message-ai {
+        margin-right: auto;
+        background-color: #f1f1f1;
+        color: #333;
+        border-radius: 18px 18px 18px 0;
+        padding: 10px 15px;
+      }
+      
+      .message-thinking {
+        margin-right: auto;
+        background-color: #f8f9fa;
+        color: #666;
+        border-radius: 18px 18px 18px 0;
+        padding: 10px 15px;
+        border: 1px dashed #ccc;
+        font-style: italic;
+      }
+      
+      .message-time {
+        font-size: 0.7rem;
+        opacity: 0.7;
+        margin-top: 5px;
+        text-align: right;
+      }
+      
+      .message-content {
+        word-break: break-word;
+      }
+      
+      .message-content pre {
+        background-color: rgba(0,0,0,0.05);
+        padding: 10px;
+        border-radius: 5px;
+        overflow-x: auto;
+        margin: 10px 0;
+      }
+      
+      .message-content code {
+        font-family: 'Courier New', monospace;
+      }
+      
+      .message-ai .message-content pre {
+        background-color: rgba(0,0,0,0.1);
+      }
+      
+      .message-user .message-content pre {
+        background-color: rgba(255,255,255,0.2);
+      }
+      
+      /* Thinking process visualization */
+      .thinking-container {
+        height: 400px;
+        overflow: hidden;
+        position: relative;
+      }
+      
+      .thinking-node {
+        position: absolute;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      
+      .thinking-node:hover {
+        transform: scale(1.1);
+        z-index: 10;
+      }
+      
+      .thinking-connection {
+        position: absolute;
+        background-color: rgba(0,0,0,0.1);
+        transform-origin: 0 0;
+        z-index: -1;
+      }
+      
+      .thinking-tooltip {
+        position: absolute;
+        background-color: rgba(0,0,0,0.8);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        max-width: 250px;
+        z-index: 100;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      
+      /* 3D Tag Cloud */
+      .tag-cloud-container {
+        height: 500px;
+        position: relative;
+        overflow: hidden;
+      }
+      
+      /* Animations */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(74, 143, 231, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(74, 143, 231, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(74, 143, 231, 0); }
+      }
+      
+      .pulse-animation {
+        animation: pulse 2s infinite;
+      }
+      
+      /* Tab styling */
+      .nav-tabs .nav-link {
+        border: none;
+        color: #495057;
+        font-weight: 500;
+        padding: 10px 15px;
+        border-radius: 0;
+        position: relative;
+      }
+      
+      .nav-tabs .nav-link.active {
+        color: #4a8fe7;
+        background-color: transparent;
+        border-bottom: 3px solid #4a8fe7;
+      }
+      
+      .nav-tabs .nav-link:hover:not(.active) {
+        border-bottom: 3px solid rgba(74, 143, 231, 0.3);
+      }
+      
+      /* Typing indicator */
+      .typing-indicator {
+        display: inline-flex;
+        align-items: center;
+      }
+      
+      .typing-indicator span {
+        height: 8px;
+        width: 8px;
+        background-color: #4a8fe7;
+        border-radius: 50%;
+        display: inline-block;
+        margin: 0 2px;
+        opacity: 0.6;
+      }
+      
+      .typing-indicator span:nth-child(1) {
+        animation: typing 1s infinite 0s;
+      }
+      
+      .typing-indicator span:nth-child(2) {
+        animation: typing 1s infinite 0.2s;
+      }
+      
+      .typing-indicator span:nth-child(3) {
+        animation: typing 1s infinite 0.4s;
+      }
+      
+      @keyframes typing {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+        100% { transform: translateY(0); }
+      }
+      
+      /* Responsive adjustments */
+      @media (max-width: 768px) {
+        .chat-container {
+          height: 400px;
+        }
+        
+        .thinking-container {
+          height: 300px;
+        }
+        
+        .tag-cloud-container {
+          height: 400px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <!-- Sidebar -->
+      <div class="sidebar" data-background-color="dark">
+        <div class="sidebar-logo">
+          <!-- Logo Header -->
+          <div class="logo-header" data-background-color="dark">
+            <a href="/" class="logo">
+              <span class="text-light fw-bold">GGFAI Framework</span>
+            </a>
+            <div class="nav-toggle">
+              <button class="btn btn-toggle toggle-sidebar">
+                <i class="gg-menu-right"></i>
+              </button>
+              <button class="btn btn-toggle sidenav-toggler">
+                <i class="gg-menu-left"></i>
+              </button>
+            </div>
+            <button class="topbar-toggler more">
+              <i class="gg-more-vertical-alt"></i>
+            </button>
+          </div>
+          <!-- End Logo Header -->
+        </div>
+        <div class="sidebar-wrapper scrollbar scrollbar-inner">
+          <div class="sidebar-content">
+            <ul class="nav nav-secondary">
+              <li class="nav-item active">
+                <a href="#" class="active">
+                  <i class="fas fa-home"></i>
+                  <p>Dashboard</p>
+                </a>
+              </li>
+              <li class="nav-section">
+                <span class="sidebar-mini-icon">
+                  <i class="fa fa-ellipsis-h"></i>
+                </span>
+                <h4 class="text-section">Controls</h4>
+              </li>
+              <li class="nav-item">
+                <a data-bs-toggle="collapse" href="#modelSection">
+                  <i class="fas fa-brain"></i>
+                  <p>Models</p>
+                  <span class="caret"></span>
+                </a>
+                <div class="collapse" id="modelSection">
+                  <ul class="nav nav-collapse">
+                    {% for model in models %}
+                    <li>
+                      <a href="#" onclick="onModelSelect('{{ model }}')">
+                        <span class="sub-item">{{ model }}</span>
+                      </a>
+                    </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </li>
+              <li class="nav-item">
+                <a data-bs-toggle="collapse" href="#analysisSection">
+                  <i class="fas fa-chart-bar"></i>
+                  <p>Analysis Methods</p>
+                  <span class="caret"></span>
+                </a>
+                <div class="collapse" id="analysisSection">
+                  <ul class="nav nav-collapse">
+                    <li>
+                      <a href="#" onclick="setAnalysisMethod('hybrid')">
+                        <span class="sub-item">Hybrid</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a href="#" onclick="setAnalysisMethod('frequency')">
+                        <span class="sub-item">Frequency</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a href="#" onclick="setAnalysisMethod('recency')">
+                        <span class="sub-item">Recency</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a href="#" onclick="setAnalysisMethod('success_rate')">
+                        <span class="sub-item">Success Rate</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a href="#" onclick="setAnalysisMethod('context_match')">
+                        <span class="sub-item">Context Match</span>
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </li>
+              <li class="nav-item">
+                <a data-bs-toggle="collapse" href="#explanationSection">
+                  <i class="fas fa-info-circle"></i>
+                  <p>Explanation Level</p>
+                  <span class="caret"></span>
+                </a>
+                <div class="collapse" id="explanationSection">
+                  <ul class="nav nav-collapse">
+                    <li>
+                      <a href="#" onclick="setExplanationLevel('simple')">
+                        <span class="sub-item">Simple</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a href="#" onclick="setExplanationLevel('standard')">
+                        <span class="sub-item">Standard</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a href="#" onclick="setExplanationLevel('technical')">
+                        <span class="sub-item">Technical</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a href="#" onclick="setExplanationLevel('developer')">
+                        <span class="sub-item">Developer</span>
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </li>
+              <li class="nav-item">
+                <a href="#" onclick="toggleThoughtProcess()">
+                  <i class="fas fa-lightbulb"></i>
+                  <p>LLM Thought Process</p>
+                </a>
+              </li>
+              <li class="nav-section">
+                <span class="sidebar-mini-icon">
+                  <i class="fa fa-ellipsis-h"></i>
+                </span>
+                <h4 class="text-section">Documentation</h4>
+              </li>
+              <li class="nav-item">
+                <a href="#">
+                  <i class="fas fa-file"></i>
+                  <p>Documentation</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="#">
+                  <i class="fas fa-cog"></i>
+                  <p>Settings</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="/donate" target="_blank">
+                  <i class="fas fa-heart text-danger"></i>
+                  <p>Support Project</p>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <!-- End Sidebar -->
+
+      <div class="main-panel">
+        <div class="main-header">
+          <div class="main-header-logo">
+            <!-- Logo Header -->
+            <div class="logo-header" data-background-color="dark">
+              <a href="/" class="logo">
+                <span class="text-light fw-bold">GGFAI Framework</span>
+              </a>
+              <div class="nav-toggle">
+                <button class="btn btn-toggle toggle-sidebar">
+                  <i class="gg-menu-right"></i>
+                </button>
+                <button class="btn btn-toggle sidenav-toggler">
+                  <i class="gg-menu-left"></i>
+                </button>
+              </div>
+              <button class="topbar-toggler more">
+                <i class="gg-more-vertical-alt"></i>
+              </button>
+            </div>
+            <!-- End Logo Header -->
+          </div>
+          <!-- Navbar Header -->
+          <nav
+            class="navbar navbar-header navbar-header-transparent navbar-expand-lg border-bottom"
+          >
+            <div class="container-fluid">
+              <ul class="navbar-nav topbar-nav ms-md-auto align-items-center">
+                <li class="nav-item me-3">
+                  <a href="#" class="nav-link" id="system-status" title="System Status">
+                    <i class="fa fa-circle text-success"></i>
+                    <span class="d-none d-md-inline-block">System Status</span>
+                  </a>
+                </li>
+                <li class="nav-item dropdown hidden-caret">
+                  <a
+                    class="nav-link dropdown-toggle"
+                    href="#"
+                    id="modelDropdown"
+                    role="button"
+                    data-bs-toggle="dropdown"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                  >
+                    <i class="fa fa-brain"></i>
+                    <span>Current Model: <span id="current-model-display">Loading...</span></span>
+                  </a>
+                  <ul
+                    class="dropdown-menu dropdown-menu-end"
+                    aria-labelledby="modelDropdown"
+                  >
+                    <li>
+                      <div class="dropdown-title">Select Model</div>
+                    </li>
+                    {% for model in models %}
+                    <li>
+                      <a class="dropdown-item" href="#" onclick="onModelSelect('{{ model }}')">{{ model }}</a>
+                    </li>
+                    {% endfor %}
+                  </ul>
+                </li>
+                <li class="nav-item">
+                  <a href="#" class="nav-link" onclick="toggleFullscreen()">
+                    <i class="fa fa-expand"></i>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </nav>
+          <!-- End Navbar -->
+        </div>
+
+        <div class="container-fluid">
+          <div class="page-inner">
+            <div class="page-header">
+              <h4 class="page-title">GGFAI Dashboard</h4>
+              <ul class="breadcrumbs">
+                <li class="nav-home">
+                  <a href="#">
+                    <i class="icon-home"></i>
+                  </a>
+                </li>
+                <li class="separator">
+                  <i class="icon-arrow-right"></i>
+                </li>
+                <li class="nav-item">
+                  <a href="#">Dashboard</a>
+                </li>
+              </ul>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="row">
+              <!-- Main Tabs -->
+              <div class="col-md-12 mb-4">
+                <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab" aria-controls="chat" aria-selected="true">
+                      <i class="fas fa-comment-alt me-2"></i>Chat
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="visualization-tab" data-bs-toggle="tab" data-bs-target="#visualization" type="button" role="tab" aria-controls="visualization" aria-selected="false">
+                      <i class="fas fa-project-diagram me-2"></i>Tag Visualization
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="thought-process-tab" data-bs-toggle="tab" data-bs-target="#thought-process" type="button" role="tab" aria-controls="thought-process" aria-selected="false">
+                      <i class="fas fa-lightbulb me-2"></i>LLM Thought Process
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system" type="button" role="tab" aria-controls="system" aria-selected="false">
+                      <i class="fas fa-server me-2"></i>System
+                    </button>
+                  </li>
+                </ul>
+                
+                <div class="tab-content" id="mainTabsContent">
+                  <!-- Chat Tab -->
+                  <div class="tab-pane fade show active" id="chat" role="tabpanel" aria-labelledby="chat-tab">
+                    <div class="row mt-4">
+                      <div class="col-md-12">
+                        <div class="card">
+                          <div class="card-header">
+                            <div class="card-head-row">
+                              <div class="card-title">AI Assistant</div>
+                              <div class="card-tools">
+                                <button type="button" class="btn btn-sm btn-primary" id="clear-chat">
+                                  <i class="fa fa-trash"></i> Clear Chat
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="card-body p-0">
+                            <div class="chat-container">
+                              <div class="chat-messages" id="chat-messages">
+                                <div class="message message-ai">
+                                  <div class="message-content">
+                                    Hello! I'm your GGFAI assistant. How can I help you today?
+                                  </div>
+                                  <div class="message-time">Just now</div>
+                                </div>
+                              </div>
+                              <div class="chat-input-container">
+                                <textarea class="chat-input form-control" id="chat-input" placeholder="Type your message here..." rows="1"></textarea>
+                                <button class="chat-send-btn btn btn-primary" id="chat-send">
+                                  <i class="fa fa-paper-plane"></i>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Visualization Tab -->
+                  <div class="tab-pane fade" id="visualization" role="tabpanel" aria-labelledby="visualization-tab">
+                    <div class="row mt-4">
+                      <!-- 3D Tag Cloud -->
+                      <div class="col-md-12 mb-4">
+                        <div class="card">
+                          <div class="card-header">
+                            <div class="card-head-row">
+                              <div class="card-title">3D Tag Cloud</div>
+                              <div class="card-tools">
+                                <div class="btn-group">
+                                  <button type="button" class="btn btn-sm btn-primary" id="refresh-3d-viz">
+                                    <i class="fa fa-sync"></i> Refresh
+                                  </button>
+                                  <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#visualizationSettingsModal">
+                                    <i class="fa fa-cog"></i> Settings
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="card-body p-0">
+                            <div class="tag-cloud-container" id="tag-cloud-container"></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- Tag Network Visualization -->
+                      <div class="col-md-12">
+                        <div class="card">
+                          <div class="card-header">
+                            <div class="card-head-row">
+                              <div class="card-title">Tag Network Visualization</div>
+                              <div class="card-tools">
+                                <div class="btn-group">
+                                  <button type="button" class="btn btn-sm btn-primary" id="refresh-viz">
+                                    <i class="fa fa-sync"></i> Refresh
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="card-body p-0">
+                            <div id="tag-viz-container" style="height: 500px;"></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- Explanation Display -->
+                      <div class="col-md-12 mt-4">
+                        <div class="card" id="explanation-container">
+                          <div class="card-header">
+                            <div class="card-title">Decision Explanation</div>
+                          </div>
+                          <div class="card-body">
+                            <div class="explanation-narrative">
+                              <p class="main-narrative">Select a tag from the visualization above to view its explanation.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Thought Process Tab -->
+                  <div class="tab-pane fade" id="thought-process" role="tabpanel" aria-labelledby="thought-process-tab">
+                    <div class="row mt-4">
+                      <div class="col-md-12">
+                        <div class="card">
+                          <div class="card-header">
+                            <div class="card-head-row">
+                              <div class="card-title">LLM Thought Process Visualization</div>
+                              <div class="card-tools">
+                                <div class="form-check form-switch">
+                                  <input class="form-check-input" type="checkbox" id="auto-update-thoughts" checked>
+                                  <label class="form-check-label" for="auto-update-thoughts">Auto-update</label>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="card-body p-0">
+                            <div class="thinking-container" id="thinking-container"></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div class="col-md-12 mt-4">
+                        <div class="card">
+                          <div class="card-header">
+                            <div class="card-head-row">
+                              <div class="card-title">Thought Process Details</div>
+                              <div class="card-tools">
+                                <button type="button" class="btn btn-sm btn-primary" id="export-thoughts">
+                                  <i class="fa fa-download"></i> Export
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="card-body">
+                            <div id="thought-details" class="p-3" style="max-height: 400px; overflow-y: auto;">
+                              <p class="text-muted">Select a thought node from the visualization above to view details.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- System Tab -->
+                  <div class="tab-pane fade" id="system" role="tabpanel" aria-labelledby="system-tab">
+                    <div class="row mt-4">
+                      <!-- Resource Monitor -->
+                      <div class="col-md-6">
+                        <div class="card">
+                          <div class="card-header">
+                            <div class="card-title">System Resources</div>
+                          </div>
+                          <div class="card-body">
+                            <div class="chart-container" style="min-height: 250px">
+                              <canvas id="resource-chart"></canvas>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- LLM Status -->
+                      <div class="col-md-6">
+                        <div class="card">
+                          <div class="card-header">
+                            <div class="card-title">LLM Status</div>
+                          </div>
+                          <div class="card-body">
+                            <div class="table-responsive">
+                              <table class="table table-hover">
+                                <thead>
+                                  <tr>
+                                    <th>Model</th>
+                                    <th>Status</th>
+                                    <th>Memory</th>
+                                    <th>Requests</th>
+                                  </tr>
+                                </thead>
+                                <tbody id="llm-status-table">
+                                  <tr>
+                                    <td colspan="4" class="text-center">Loading model data...</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- System Logs -->
+                      <div class="col-md-12 mt-4">
+                        <div class="card">
+                          <div class="card-header">
+                            <div class="card-title">System Logs</div>
+                            <div class="card-tools">
+                              <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="auto-update-logs" checked>
+                                <label class="form-check-label" for="auto-update-logs">Auto-update</label>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="card-body">
+                            <div class="log-container p-3 bg-dark text-light" style="height: 300px; overflow-y: auto; font-family: monospace; border-radius: 5px;">
+                              <div id="system-logs">
+                                <div class="log-entry">[INFO] System initialized</div>
+                                <div class="log-entry">[INFO] Loading models...</div>
+                                <div class="log-entry">[INFO] WebSocket server started</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Voice Input Button -->
+        <button id="mic-btn" class="btn btn-primary btn-round btn-lg position-fixed" style="bottom: 30px; right: 30px; width: 60px; height: 60px; z-index: 1000;">
+          <i class="fa fa-microphone"></i>
+        </button>
+
+        <!-- Analysis Settings Modal -->
+        <div class="modal fade" id="analysisSettingsModal" tabindex="-1" role="dialog" aria-labelledby="analysisSettingsModalLabel" aria-hidden="true">
+          <div class="modal-dialog" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="analysisSettingsModalLabel">Analysis Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="form-group">
+                  <label for="analysis-method">Tag Analysis Method</label>
+                  <select id="analysis-method" class="form-control">
+                    <option value="hybrid" selected>Hybrid</option>
+                    <option value="frequency">Frequency</option>
+                    <option value="recency">Recency</option>
+                    <option value="success_rate">Success Rate</option>
+                    <option value="context_match">Context Match</option>
+                  </select>
+                </div>
+                <div class="form-group mt-3">
+                  <label for="explanation-level">Explanation Detail Level</label>
+                  <select id="explanation-level" class="form-control">
+                    <option value="simple">Simple</option>
+                    <option value="standard" selected>Standard</option>
+                    <option value="technical">Technical</option>
+                    <option value="developer">Developer</option>
+                  </select>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="apply-settings" data-bs-dismiss="modal">Apply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Visualization Settings Modal -->
+        <div class="modal fade" id="visualizationSettingsModal" tabindex="-1" role="dialog" aria-labelledby="visualizationSettingsModalLabel" aria-hidden="true">
+          <div class="modal-dialog" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="visualizationSettingsModalLabel">Visualization Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="form-group">
+                  <label for="visualization-type">Visualization Type</label>
+                  <select id="visualization-type" class="form-control">
+                    <option value="3d-cloud" selected>3D Tag Cloud</option>
+                    <option value="force-directed">Force-Directed Graph</option>
+                    <option value="radial">Radial Layout</option>
+                    <option value="hierarchical">Hierarchical Tree</option>
+                  </select>
+                </div>
+                <div class="form-group mt-3">
+                  <label for="animation-speed">Animation Speed</label>
+                  <input type="range" class="form-range" min="1" max="10" value="5" id="animation-speed">
+                </div>
+                <div class="form-group mt-3">
+                  <label for="node-size">Node Size</label>
+                  <input type="range" class="form-range" min="1" max="10" value="5" id="node-size">
+                </div>
+                <div class="form-check mt-3">
+                  <input class="form-check-input" type="checkbox" id="show-labels" checked>
+                  <label class="form-check-label" for="show-labels">
+                    Show Labels
+                  </label>
+                </div>
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" id="enable-physics" checked>
+                  <label class="form-check-label" for="enable-physics">
+                    Enable Physics
+                  </label>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="apply-viz-settings" data-bs-dismiss="modal">Apply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="footer">
+          <div class="container-fluid d-flex justify-content-between">
+            <nav class="pull-left">
+              <ul class="nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="#">
+                    GGFAI Framework
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="#"> Help </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="#"> Documentation </a>
+                </li>
+              </ul>
+            </nav>
+            <div class="copyright">
+              GGFAI Framework Dashboard
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+    <!--   Core JS Files   -->
+    <script src="/static/assets/js/core/jquery-3.7.1.min.js"></script>
+    <script src="/static/assets/js/core/popper.min.js"></script>
+    <script src="/static/assets/js/core/bootstrap.min.js"></script>
+
+    <!-- jQuery Scrollbar -->
+    <script src="/static/assets/js/plugin/jquery-scrollbar/jquery.scrollbar.min.js"></script>
+
+    <!-- Chart JS -->
+    <script src="/static/assets/js/plugin/chart.js/chart.min.js"></script>
+
+    <!-- Bootstrap Notify -->
+    <script src="/static/assets/js/plugin/bootstrap-notify/bootstrap-notify.min.js"></script>
+
+    <!-- Kaiadmin JS -->
+    <script src="/static/assets/js/kaiadmin.min.js"></script>
+    
+    <!-- GGFAI App JS -->
+    <script src="/static/app.js"></script>
+  </body>
+</html>
