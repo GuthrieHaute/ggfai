@@ -9,6 +9,11 @@ Key Improvements:
 5. Structured logging
 6. Configurable security settings
 7. Health checks and monitoring endpoints
+8. Chat interface with LLM thought process visualization
+9. 3D tag cloud visualization
+10. Voice processing with multiple STT/TTS engines
+11. Natural conversation handling
+12. YOLO vision integration
 """
 
 import asyncio
@@ -16,9 +21,14 @@ import gzip
 import json
 import logging
 import time
+import os
+import random
+import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Union, Set
 
+import cv2
+import numpy as np
 import ollama
 import uvicorn
 from fastapi import (
@@ -28,11 +38,15 @@ from fastapi import (
     Request, 
     HTTPException,
     status,
-    Depends
+    Depends,
+    File,
+    UploadFile,
+    Form,
+    BackgroundTasks
 )
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -40,6 +54,7 @@ from fastapi.encoders import jsonable_encoder
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # Import GGFAI components
 from ml_layer.agent.tag_analyzer import TagAnalyzer, AnalysisMethod
@@ -49,17 +64,53 @@ from trackers.context_tracker import ContextTracker
 from trackers.analytics_tracker import AnalyticsTracker
 from ml_layer.agent.generate_explanation import ExplanationGenerator, ExplanationConfig, ExplanationLevel
 from ml_layer.agent.planning_service import PlanningService
+from ml_layer.llm_coordinator import llm_coordinator
+from ml_layer.model_adapter import ModelAdapter
+from entry_points.voice import VoiceProcessor, VoiceConfig, RecognitionEngine, TTSEngine
+from ml_layer.intent_engine import IntentEngine
+from core.tag_registry import TagRegistry
 
 # Configuration
 class Config:
-    DEBUG = False
+    DEBUG = True  # Set to False in production
     API_KEY_NAME = "X-API-KEY"
     MAX_WS_CONNECTIONS = 100
     WS_MAX_SIZE = 2 ** 20  # 1MB
     COMPRESSION_MIN_SIZE = 500
     RATE_LIMIT = "100/minute"
+    ALLOWED_ORIGINS = ["*"] if True else ["https://yourdomain.com"]  # Set appropriate origins in production
+    DEFAULT_MODEL = "llama2"  # Default LLM model
+    ENABLE_HTTPS = False  # Set to True in production
+    ENABLE_DONATION = True  # Enable donation link
+    ENABLE_THOUGHT_PROCESS = True  # Enable LLM thought process visualization
+    ENABLE_VOICE_PROCESSING = True  # Enable voice processing features
+    ENABLE_YOLO = True  # Enable YOLO object detection
+    DEFAULT_YOLO_MODEL = "default"  # Default YOLO model
+    YOLO_CONFIDENCE_THRESHOLD = 0.5  # Default confidence threshold for YOLO
+    DEFAULT_TTS_ENGINE = TTSEngine.SYSTEM  # Default TTS engine
+    DEFAULT_STT_ENGINES = [RecognitionEngine.GOOGLE, RecognitionEngine.SPHINX]  # Default STT engines
+    AUDIO_CACHE_DIR = "audio_cache"  # Directory for caching audio files
 
+    # Add configuration system
+    def save_to_file(self):
+        """Save current configuration to file"""
+        config_path = Path("config/webapp_config.json")
+        config_path.parent.mkdir(exist_ok=True)
+        with open(config_path, "w") as f:
+            json.dump(self.__dict__, f, indent=2)
+    
+    def load_from_file(self):
+        """Load configuration from file"""
+        config_path = Path("config/webapp_config.json")
+        if config_path.exists():
+            with open(config_path) as f:
+                config = json.load(f)
+                self.__dict__.update(config)
+
+# Initialize config
 config = Config()
+config.load_from_file()
+
 api_key_header = APIKeyHeader(name=config.API_KEY_NAME, auto_error=False)
 
 # Initialize FastAPI
@@ -68,14 +119,16 @@ app = FastAPI(
     description="Secure real-time control plane for GGFAI",
     version="2.0",
     docs_url=None if not config.DEBUG else "/docs",
-    redoc_url=None
+    redoc_url=None if not config.DEBUG else "/redoc"
 )
 
 # Security middleware
-app.add_middleware(HTTPSRedirectMiddleware)
+if config.ENABLE_HTTPS:
+    app.add_middleware(HTTPSRedirectMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://yourdomain.com"] if not config.DEBUG else ["*"],
+    allow_origins=config.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -87,20 +140,16 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 
 # Static files and templates
+static_dir = Path(__file__).parent / "static"
+templates_dir = Path(__file__).parent / "templates"
+
 app.mount(
     "/static", 
-    StaticFiles(directory="static"), 
+    StaticFiles(directory=str(static_dir)), 
     name="static"
 )
 
-# Mount Bootstrap assets
-app.mount(
-    "/static/assets", 
-    StaticFiles(directory="../static/assets"), 
-    name="bootstrap_assets"
-)
-
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=str(templates_dir))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -112,6 +161,9 @@ intent_tracker = IntentTracker()
 feature_tracker = FeatureTracker()
 context_tracker = ContextTracker()
 analytics_tracker = AnalyticsTracker()
+intent_engine = IntentEngine()
+model_adapter = ModelAdapter()
+tag_registry = TagRegistry()
 
 # Initialize tag analyzer
 tag_analyzer = TagAnalyzer(
@@ -141,537 +193,247 @@ explanation_generator = ExplanationGenerator(
     analytics_tracker=analytics_tracker
 )
 
-class WebSocketManager:
-    """Thread-safe WebSocket connection manager with connection limits."""
-    
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-        self._lock = asyncio.Lock()
-        self.connection_count = 0
-
-    async def connect(self, websocket: WebSocket) -> bool:
-        """Attempt to add new connection with limit enforcement."""
-        async with self._lock:
-            if self.connection_count >= config.MAX_WS_CONNECTIONS:
-                logger.warning("Connection limit reached")
-                return False
-                
-            await websocket.accept()
-            self.active_connections.append(websocket)
-            self.connection_count += 1
-            logger.info(f"New WS connection (Total: {self.connection_count})")
-            return True
-
-    async def disconnect(self, websocket: WebSocket) -> None:
-        """Safely remove a connection."""
-        async with self._lock:
-            if websocket in self.active_connections:
-                self.active_connections.remove(websocket)
-                self.connection_count -= 1
-                logger.info(f"WS disconnected (Remaining: {self.connection_count})")
-
-    async def send_personal_message(
-        self, 
-        message: Dict, 
-        websocket: WebSocket
-    ) -> bool:
-        """Send message to single client with error handling."""
-        try:
-            await websocket.send_json(message)
-            return True
-        except (WebSocketDisconnect, RuntimeError) as e:
-            logger.warning(f"WS send failed: {str(e)}")
-            await self.disconnect(websocket)
-            return False
-
-    async def broadcast(self, message: Dict) -> None:
-        """Broadcast to all active connections."""
-        dead_connections = []
-        async with self._lock:
-            for connection in self.active_connections:
-                try:
-                    await connection.send_json(message)
-                except (WebSocketDisconnect, RuntimeError):
-                    dead_connections.append(connection)
-            
-            # Clean up dead connections
-            for connection in dead_connections:
-                await self.disconnect(connection)
-
-manager = WebSocketManager()
-
-# --- Security Helpers ---
-async def validate_api_key(api_key: Optional[str] = None) -> bool:
-    """Validate API key against configured keys."""
-    # In production, replace with proper key validation
-    if config.DEBUG:
-        return True
-    return api_key == "your_secure_key_here"
-
-# --- Routes ---
-@app.get("/", response_class=HTMLResponse)
-@limiter.limit(config.RATE_LIMIT)
-async def dashboard(
-    request: Request,
-    api_key: str = Depends(api_key_header)
-) -> HTMLResponse:
-    """Serve main dashboard with security checks."""
-    if not await validate_api_key(api_key):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid API key"
+# Initialize voice processor if enabled
+voice_processor = None
+if config.ENABLE_VOICE_PROCESSING:
+    try:
+        # Create voice config
+        voice_config = VoiceConfig(
+            tts_engine=config.DEFAULT_TTS_ENGINE,
+            recognition_engines=config.DEFAULT_STT_ENGINES,
+            audio_cache_dir=config.AUDIO_CACHE_DIR
         )
         
-    # Get available models for the dropdown
-    models = await _get_available_models()
-    
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-            "api_key": api_key,
-            "debug": config.DEBUG,
-            "models": models
-        }
-    )
+        # Initialize voice processor
+        voice_processor = VoiceProcessor(voice_config)
+        logger.info("Voice processor initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize voice processor: {e}")
+
+# Initialize YOLO video processor if enabled
+YOLO_MODELS = {
+    'default': 'yolov8n.pt',
+    'custom': 'models/custom_yolo.pt'
+}
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[int, WebSocket] = {}
+        self.client_contexts: Dict[int, Set[str]] = {}
+        self.yolo_states: Dict[int, bool] = {}
+        
+    async def connect(self, websocket: WebSocket, client_id: int):
+        await websocket.accept()
+        self.active_connections[client_id] = websocket
+        self.client_contexts[client_id] = set()
+        self.yolo_states[client_id] = False
+        
+    def disconnect(self, client_id: int):
+        self.active_connections.pop(client_id, None)
+        self.client_contexts.pop(client_id, None)
+        self.yolo_states.pop(client_id, None)
+        
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections.values():
+            await connection.send_json(message)
+            
+    def get_client_context(self, client_id: int) -> Set[str]:
+        return self.client_contexts.get(client_id, set())
+        
+    def update_client_context(self, client_id: int, context: Set[str]):
+        self.client_contexts[client_id] = context
+
+manager = ConnectionManager()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """Handle WebSocket connections with validation."""
-    # Validate origin in production
-    if not config.DEBUG and websocket.headers.get("origin") not in ["https://yourdomain.com"]:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
-    if not await manager.connect(websocket):
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
+    client_id = id(websocket)
+    await manager.connect(websocket, client_id)
+    
     try:
         while True:
-            try:
-                data = await websocket.receive_json()
-                await _handle_websocket_message(data, websocket)
-            except json.JSONDecodeError:
-                await websocket.send_json({"error": "Invalid JSON"})
-            except ValueError as e:
-                await websocket.send_json({"error": str(e)})
+            data = await websocket.receive_json()
+            
+            if data['type'] == 'message':
+                # Process message with natural conversation understanding
+                await process_message(websocket, client_id, data)
                 
+            elif data['type'] == 'config_update':
+                # Handle configuration updates (e.g., YOLO toggle)
+                manager.yolo_states[client_id] = data.get('yolo_enabled', False)
+                if 'yolo_model' in data:
+                    await update_yolo_model(websocket, data['yolo_model'])
+                    
     except WebSocketDisconnect:
-        await manager.disconnect(websocket)
-    except Exception as e:
-        logger.error(f"WebSocket error: {str(e)}", exc_info=True)
-        await manager.disconnect(websocket)
+        manager.disconnect(client_id)
 
-async def _handle_websocket_message(data: Dict, websocket: WebSocket) -> None:
-    """Process and validate WebSocket messages."""
-    if not isinstance(data, dict):
-        raise ValueError("Message must be JSON object")
-        
-    message_type = data.get("type")
+async def process_message(websocket: WebSocket, client_id: int, data: dict):
+    message = data['content']
+    yolo_enabled = manager.yolo_states.get(client_id, False)
     
-    if message_type == "model_change":
-        await _handle_model_change(data, websocket)
-    elif message_type == "user_input":
-        await _handle_user_input(data)
-    elif message_type == "tag_analysis_request":
-        await _handle_tag_analysis_request(data, websocket)
-    elif message_type == "explanation_request":
-        await _handle_explanation_request(data, websocket)
-    else:
-        raise ValueError("Invalid message type")
-        
-async def _handle_tag_analysis_request(data: Dict, websocket: WebSocket) -> None:
-    """Handle real-time tag analysis requests."""
+    # Start thinking indication
+    await websocket.send_json({"type": "thinking_start"})
+    
     try:
-        context_id = data.get("context_id")
-        method = data.get("method", "hybrid")
-        limit = min(int(data.get("limit", 10)), 50)  # Cap at 50 for performance
+        # Get current context
+        current_context = manager.get_client_context(client_id)
         
-        # Get context
-        context = {}
-        if context_id:
-            context = context_tracker.get_context(context_id) or {}
-        else:
-            # Use most recent context
-            contexts = context_tracker.get_recent_contexts(1)
-            if contexts:
-                context = contexts[0]
+        # Process visual input if YOLO is enabled
+        visual_context = set()
+        if yolo_enabled:
+            visual_context = await process_visual_input(data.get('yolo_model', 'default'))
+            current_context.update(visual_context)
+        
+        # Generate response using intent engine
+        intent = intent_engine.process(
+            message,
+            context=current_context
+        )
+        
+        # Track the intent
+        intent_tracker.track(intent)
+        
+        # Generate natural response
+        response = await generate_natural_response(intent, current_context)
+        
+        # Update context
+        context_tracker.update(intent, response)
+        manager.update_client_context(client_id, current_context)
+        
+        # Send response with any visual context
+        await websocket.send_json({
+            "type": "response",
+            "content": response,
+            "visual_context": list(visual_context) if visual_context else None
+        })
+        
+    except Exception as e:
+        logger.error(f"Error processing message: {str(e)}")
+        await websocket.send_json({
+            "type": "error",
+            "message": "Sorry, I encountered an error processing your message."
+        })
+
+async def process_visual_input(model_name: str = 'default') -> Set[str]:
+    """Process video input using YOLO and return detected objects/context"""
+    try:
+        model_path = YOLO_MODELS.get(model_name, YOLO_MODELS['default'])
+        
+        # Get frame from webcam
+        cap = cv2.VideoCapture(0)
+        ret, frame = cap.read()
+        cap.release()
+        
+        if not ret:
+            logger.warning("Failed to capture video frame")
+            return set()
+        
+        # Process frame with YOLO
+        results = model_adapter.detect_objects(
+            frame,
+            model_path=model_path
+        )
+        
+        # Convert detections to context
+        context = set()
+        for detection in results:
+            confidence = detection.get('confidence', 0)
+            if confidence > 0.5:  # Confidence threshold
+                context.add(detection['class'])
                 
-        # Convert method string to enum
-        analysis_method = AnalysisMethod.HYBRID
-        try:
-            analysis_method = AnalysisMethod(method.lower())
-        except ValueError:
-            logger.warning(f"Invalid analysis method: {method}, using HYBRID")
-            
-        # Get tag analysis
-        ranked_tags = tag_analyzer.prioritize_tags(
-            context,
-            method=analysis_method,
-            limit=limit
+        return context
+        
+    except Exception as e:
+        logger.error(f"Error in visual processing: {str(e)}")
+        return set()
+
+async def generate_natural_response(intent: dict, context: Set[str]) -> str:
+    """Generate a natural, contextual response based on intent and context"""
+    try:
+        # Get response template based on intent
+        template = intent_engine.get_response_template(intent)
+        
+        # Personalize based on context
+        response = model_adapter.generate_response(
+            template=template,
+            context=context,
+            style="conversational"  # Ensure natural dialogue style
         )
         
-        # Generate visualization data
-        visualization_data = {
-            "nodes": [],
-            "edges": []
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error generating response: {str(e)}")
+        return "I apologize, but I'm having trouble formulating a response right now."
+
+async def update_yolo_model(websocket: WebSocket, model_name: str):
+    """Update the YOLO model configuration"""
+    try:
+        if model_name in YOLO_MODELS:
+            # Validate model file exists
+            model_path = Path(YOLO_MODELS[model_name])
+            if not model_path.exists():
+                raise FileNotFoundError(f"Model file not found: {model_path}")
+                
+            await websocket.send_json({
+                "type": "model_loaded",
+                "model": model_name
+            })
+        else:
+            raise ValueError(f"Invalid model name: {model_name}")
+            
+    except Exception as e:
+        logger.error(f"Error updating YOLO model: {str(e)}")
+        await websocket.send_json({
+            "type": "error",
+            "message": f"Failed to load YOLO model: {model_name}"
+        })
+
+@app.get("/")
+async def root(request):
+    """Render the main dashboard"""
+    return templates.TemplateResponse(
+        "dashboard_new.html",
+        {
+            "request": request,
+            "models": list(YOLO_MODELS.keys()),
+            "debug": config.DEBUG
         }
-        
-        # Add context node
-        visualization_data["nodes"].append({
-            "id": "context",
-            "label": "Current Context",
-            "color": "#FF6B6B",
-            "size": 25
-        })
-        
-        # Add tag nodes and edges
-        for i, tag_info in enumerate(ranked_tags):
-            node_id = f"tag_{i}"
-            visualization_data["nodes"].append({
-                "id": node_id,
-                "label": f"{tag_info['tag_id']}\nScore: {tag_info['score']:.2f}",
-                "color": "#4ECDC4",
-                "size": 15 + tag_info['score'] * 10
-            })
-            
-            visualization_data["edges"].append({
-                "from": "context",
-                "to": node_id,
-                "width": tag_info['score'] * 5,
-                "title": f"Score: {tag_info['score']:.2f}"
-            })
-            
-        await manager.send_personal_message(
-            {
-                "type": "tag_analysis_response",
-                "request_id": data.get("request_id", ""),
-                "analysis_method": analysis_method.value,
-                "context": context,
-                "ranked_tags": ranked_tags,
-                "visualization_data": visualization_data
-            },
-            websocket
-        )
-    except Exception as e:
-        logger.error(f"Tag analysis error: {str(e)}", exc_info=True)
-        await manager.send_personal_message(
-            {
-                "type": "error",
-                "request_id": data.get("request_id", ""),
-                "message": "Tag analysis failed"
-            },
-            websocket
-        )
-        
-async def _handle_explanation_request(data: Dict, websocket: WebSocket) -> None:
-    """Handle real-time explanation requests."""
-    try:
-        trace_id = data.get("trace_id")
-        if not trace_id:
-            raise ValueError("Missing trace_id")
-            
-        level = data.get("level", "standard")
-        use_physics = data.get("use_physics", True)
-        
-        # Convert level string to enum
-        explanation_level = ExplanationLevel.STANDARD
-        try:
-            explanation_level = ExplanationLevel[level.upper()]
-        except (KeyError, ValueError):
-            logger.warning(f"Invalid explanation level: {level}, using STANDARD")
-            
-        # Create explanation config
-        config = ExplanationConfig(
-            level=explanation_level,
-            use_physics_viz=use_physics
-        )
-        
-        # Get context for the trace
-        context = context_tracker.get_context(trace_id) or {}
-        
-        # Get goal data
-        goal_data = {"intent": trace_id}  # Simplified for demo
-        intent = intent_tracker.get_intent(trace_id)
-        if intent:
-            goal_data = intent
-            
-        # Generate explanation
-        explanation_data = explanation_generator.generate_for_web(
-            trace_id=trace_id,
-            context=context,
-            goal_data=goal_data,
-            config=config
-        )
-        
-        await manager.send_personal_message(
-            {
-                "type": "explanation_response",
-                "request_id": data.get("request_id", ""),
-                "trace_id": trace_id,
-                "explanation": explanation_data
-            },
-            websocket
-        )
-    except Exception as e:
-        logger.error(f"Explanation error: {str(e)}", exc_info=True)
-        await manager.send_personal_message(
-            {
-                "type": "error",
-                "request_id": data.get("request_id", ""),
-                "message": "Explanation generation failed"
-            },
-            websocket
-        )
-
-async def _handle_model_change(data: Dict, websocket: WebSocket) -> None:
-    """Handle model switching requests."""
-    try:
-        model = data["model"]
-        if model not in await _get_available_models():
-            raise ValueError("Invalid model specified")
-            
-        response = ollama.generate(
-            model=model,
-            prompt="Confirm model switch",
-            stream=False
-        )
-        
-        await manager.send_personal_message(
-            {
-                "type": "model_confirmation",
-                "model": model,
-                "response": response
-            },
-            websocket
-        )
-    except KeyError:
-        raise ValueError("Missing required fields")
-    except ollama.ResponseError as e:
-        logger.error(f"Model error: {str(e)}")
-        raise ValueError("Model operation failed")
-
-async def _handle_user_input(data: Dict) -> None:
-    """Process user input messages."""
-    try:
-        text = data["text"]
-        if len(text) > 1000:  # Prevent abuse
-            raise ValueError("Input too long")
-            
-        await manager.broadcast({
-            "type": "intent_update",
-            "input": text[:1000],  # Enforce limit
-            "timestamp": time.time()
-        })
-    except KeyError:
-        raise ValueError("Missing text field")
-
-@app.get("/api/models")
-@limiter.limit(config.RATE_LIMIT)
-async def list_gguf_models() -> JSONResponse:
-    """Fetch available GGUF models with caching."""
-    try:
-        models = await _get_available_models()
-        return JSONResponse(
-            content=jsonable_encoder(models),
-            headers={"Cache-Control": "public, max-age=60"}
-        )
-    except ollama.ResponseError as e:
-        logger.error(f"Model list error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Model service unavailable"
-        )
-        
-@app.get("/api/explanation/{trace_id}")
-@limiter.limit(config.RATE_LIMIT)
-async def get_explanation(
-    request: Request,
-    trace_id: str,
-    level: str = "standard",
-    use_physics: bool = True,
-    api_key: str = Depends(api_key_header)
-) -> JSONResponse:
-    """
-    Get explanation for a decision trace.
-    
-    Args:
-        trace_id: Trace ID to explain
-        level: Explanation level (simple, standard, technical, developer)
-        use_physics: Whether to use physics in visualization
-        
-    Returns:
-        Explanation data with narrative and visualization
-    """
-    if not await validate_api_key(api_key):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid API key"
-        )
-        
-    try:
-        # Convert level string to enum
-        explanation_level = ExplanationLevel.STANDARD
-        try:
-            explanation_level = ExplanationLevel[level.upper()]
-        except (KeyError, ValueError):
-            logger.warning(f"Invalid explanation level: {level}, using STANDARD")
-            
-        # Create explanation config
-        config = ExplanationConfig(
-            level=explanation_level,
-            use_physics_viz=use_physics
-        )
-        
-        # Get context for the trace
-        context = context_tracker.get_context(trace_id) or {}
-        
-        # Get goal data
-        goal_data = {"intent": trace_id}  # Simplified for demo
-        intent = intent_tracker.get_intent(trace_id)
-        if intent:
-            goal_data = intent
-            
-        # Generate explanation
-        explanation_data = explanation_generator.generate_for_web(
-            trace_id=trace_id,
-            context=context,
-            goal_data=goal_data,
-            config=config
-        )
-        
-        return JSONResponse(
-            content=jsonable_encoder(explanation_data),
-            headers={"Cache-Control": "private, max-age=30"}
-        )
-    except Exception as e:
-        logger.error(f"Explanation error: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Explanation generation failed"
-        )
-
-async def _get_available_models() -> List[str]:
-    """Get available models with error handling."""
-    result = ollama.list()
-    return [m["name"] for m in result.get("models", [])]
+    )
 
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
     """Health check endpoint for monitoring."""
     return {"status": "healthy"}
 
-@app.get("/api/tag-analysis")
-@limiter.limit(config.RATE_LIMIT)
-async def get_tag_analysis(
+@app.get("/api/config")
+async def get_config() -> Dict:
+    """Get current configuration"""
+    return {k: v for k, v in config.__dict__.items() 
+            if not k.startswith('_')}
+
+@app.post("/api/config")
+async def update_config(
+    updates: Dict[str, Any],
     request: Request,
-    context_id: Optional[str] = None,
-    method: str = "hybrid",
-    limit: int = 10,
     api_key: str = Depends(api_key_header)
-) -> JSONResponse:
-    """
-    Get tag analysis visualization data.
-    
-    Args:
-        context_id: Optional context ID to analyze
-        method: Analysis method (frequency, recency, success_rate, context_match, hybrid)
-        limit: Maximum number of tags to return
-        
-    Returns:
-        Tag analysis data for visualization
-    """
+) -> Dict[str, str]:
+    """Update configuration settings"""
     if not await validate_api_key(api_key):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid API key"
         )
-        
-    try:
-        # Get current context
-        context = {}
-        if context_id:
-            context = context_tracker.get_context(context_id) or {}
-        else:
-            # Use most recent context
-            contexts = context_tracker.get_recent_contexts(1)
-            if contexts:
-                context = contexts[0]
-                
-        # Convert method string to enum
-        analysis_method = AnalysisMethod.HYBRID
-        try:
-            analysis_method = AnalysisMethod(method.lower())
-        except ValueError:
-            logger.warning(f"Invalid analysis method: {method}, using HYBRID")
-            
-        # Get tag analysis
-        ranked_tags = tag_analyzer.prioritize_tags(
-            context,
-            method=analysis_method,
-            limit=limit
-        )
-        
-        # Generate visualization data
-        visualization_data = {
-            "nodes": [],
-            "edges": []
-        }
-        
-        # Add context node
-        visualization_data["nodes"].append({
-            "id": "context",
-            "label": "Current Context",
-            "color": "#FF6B6B",
-            "size": 25
-        })
-        
-        # Add tag nodes and edges
-        for i, tag_info in enumerate(ranked_tags):
-            node_id = f"tag_{i}"
-            visualization_data["nodes"].append({
-                "id": node_id,
-                "label": f"{tag_info['tag_id']}\nScore: {tag_info['score']:.2f}",
-                "color": "#4ECDC4",
-                "size": 15 + tag_info['score'] * 10
-            })
-            
-            visualization_data["edges"].append({
-                "from": "context",
-                "to": node_id,
-                "width": tag_info['score'] * 5,
-                "title": f"Score: {tag_info['score']:.2f}"
-            })
-            
-        return JSONResponse(
-            content=jsonable_encoder({
-                "analysis_method": analysis_method.value,
-                "context": context,
-                "ranked_tags": ranked_tags,
-                "visualization_data": visualization_data
-            }),
-            headers={"Cache-Control": "private, max-age=10"}
-        )
-    except Exception as e:
-        logger.error(f"Tag analysis error: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Tag analysis failed"
-        )
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc):
-    """Custom error handler for security."""
-    security_logger.warning(
-        f"HTTPException: {exc.status_code} - {exc.detail}",
-        extra={"client": request.client.host}
-    )
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
-        headers={"X-Error": "true"}
-    )
+    
+    # Validate updates
+    for key, value in updates.items():
+        if hasattr(config, key):
+            setattr(config, key, value)
+    
+    # Save to file
+    config.save_to_file()
+    
+    return {"status": "Configuration updated successfully"}
 
 if __name__ == "__main__":
     uvicorn.run(
