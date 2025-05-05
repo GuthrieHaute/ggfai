@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Support GGFAI Framework</title>
+    <meta
+      content="width=device-width, initial-scale=1.0, shrink-to-fit=no"
+      name="viewport"
+    />
+    <link
+      rel="icon"
+      href="/static/assets/img/kaiadmin/favicon.ico"
+      type="image/x-icon"
+    />
+
+    <!-- Fonts and icons -->
+    <script src="/static/assets/js/plugin/webfont/webfont.min.js"></script>
+    <script>
+      WebFont.load({
+        google: { families: ["Public Sans:300,400,500,600,700"] },
+        custom: {
+          families: [
+            "Font Awesome 5 Solid",
+            "Font Awesome 5 Regular",
+            "Font Awesome 5 Brands",
+            "simple-line-icons",
+          ],
+          urls: ["/static/assets/css/fonts.min.css"],
+        },
+        active: function () {
+          sessionStorage.fonts = true;
+        },
+      });
+    </script>
+
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="/static/assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="/static/assets/css/plugins.min.css" />
+    <link rel="stylesheet" href="/static/assets/css/kaiadmin.min.css" />
+    <link rel="stylesheet" href="/static/style.css" />
+    
+    <style>
+      .donation-card {
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+      
+      .donation-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+      }
+      
+      .donation-header {
+        background: linear-gradient(135deg, #4a8fe7 0%, #3a7bd5 100%);
+        padding: 25px;
+        color: white;
+      }
+      
+      .donation-amount {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0;
+      }
+      
+      .donation-period {
+        opacity: 0.8;
+        font-size: 1rem;
+      }
+      
+      .donation-feature {
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+      }
+      
+      .donation-feature i {
+        color: #4a8fe7;
+        margin-right: 10px;
+      }
+      
+      .donation-btn {
+        border-radius: 30px;
+        padding: 10px 25px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+      }
+      
+      .donation-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(74, 143, 231, 0.4);
+      }
+      
+      .payment-icon {
+        font-size: 2rem;
+        margin: 0 10px;
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+      }
+      
+      .payment-icon:hover {
+        opacity: 1;
+      }
+      
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(74, 143, 231, 0.7);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(74, 143, 231, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(74, 143, 231, 0);
+        }
+      }
+      
+      .pulse-animation {
+        animation: pulse 2s infinite;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container py-5">
+      <div class="row justify-content-center">
+        <div class="col-md-10">
+          <div class="text-center mb-5">
+            <h1 class="fw-bold">Support the GGFAI Framework</h1>
+            <p class="lead">Help us continue developing this open-source AI framework for everyone</p>
+          </div>
+          
+          <div class="row">
+            <!-- One-time donation -->
+            <div class="col-md-4 mb-4">
+              <div class="donation-card h-100">
+                <div class="donation-header text-center">
+                  <h3>One-time Donation</h3>
+                  <p class="donation-amount">$25</p>
+                  <p class="donation-period">or custom amount</p>
+                </div>
+                <div class="card-body">
+                  <div class="donation-feature">
+                    <i class="fas fa-check"></i> Support ongoing development
+                  </div>
+                  <div class="donation-feature">
+                    <i class="fas fa-check"></i> Name in contributors list
+                  </div>
+                  <div class="donation-feature">
+                    <i class="fas fa-check"></i> Good karma
+                  </div>
+                  <div class="text-center mt-4">
+                    <button class="btn btn-primary donation-btn">Donate Now</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Monthly donation -->
+            <div class="col-md-4 mb-4">
+              <div class="donation-card h-100 pulse-animation">
+                <div class="donation-header text-center" style="background: linear-gradient(135deg, #8ac926 0%, #5ca904 100%);">
+                  <h3>Monthly Support</h3>
+                  <p class="donation-amount">$10</p>
+                  <p class="donation-period">per month</p>
+                </div>
+                <div class="card-body">
+                  <div class="donation-feature">
+                    <i class="fas fa-check"></i> All one-time benefits
+                  </div>
+                  <div class="donation-feature">
+                    <i class="fas fa-check"></i> Early access to new features
+                  </div>
+                  <div class="donation-feature">
+                    <i class="fas fa-check"></i> Monthly development updates
+                  </div>
+                  <div class="text-center mt-4">
+                    <button class="btn btn-success donation-btn">Subscribe</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Sponsor donation -->
+            <div class="col-md-4 mb-4">
+              <div class="donation-card h-100">
+                <div class="donation-header text-center" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);">
+                  <h3>Become a Sponsor</h3>
+                  <p class="donation-amount">$100+</p>
+                  <p class="donation-period">customizable</p>
+                </div>
+                <div class="card-body">
+                  <div class="donation-feature">
+                    <i class="fas fa-check"></i> All monthly benefits
+                  </div>
+                  <div class="donation-feature">
+                    <i class="fas fa-check"></i> Logo on project website
+                  </div>
+                  <div class="donation-feature">
+                    <i class="fas fa-check"></i> Custom feature prioritization
+                  </div>
+                  <div class="text-center mt-4">
+                    <button class="btn btn-danger donation-btn">Sponsor Us</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="text-center mt-5">
+            <h4>Other Ways to Support</h4>
+            <p>Contribute code, report bugs, or help with documentation</p>
+            <div class="mt-3">
+              <a href="#" class="btn btn-outline-primary me-2"><i class="fab fa-github"></i> GitHub</a>
+              <a href="#" class="btn btn-outline-info"><i class="fas fa-book"></i> Documentation</a>
+            </div>
+            
+            <div class="mt-5">
+              <h5>Payment Methods</h5>
+              <div class="d-flex justify-content-center mt-3">
+                <i class="fab fa-cc-visa payment-icon"></i>
+                <i class="fab fa-cc-mastercard payment-icon"></i>
+                <i class="fab fa-cc-paypal payment-icon"></i>
+                <i class="fab fa-cc-amex payment-icon"></i>
+                <i class="fab fa-bitcoin payment-icon"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!--   Core JS Files   -->
+    <script src="/static/assets/js/core/jquery-3.7.1.min.js"></script>
+    <script src="/static/assets/js/core/popper.min.js"></script>
+    <script src="/static/assets/js/core/bootstrap.min.js"></script>
+  </body>
+</html>

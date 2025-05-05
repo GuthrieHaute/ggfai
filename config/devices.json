@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "GGFAI Device Registry - Maps hardware tiers to capabilities and AI fallbacks",
+  "devices": {
+    "garbage": {
+      "examples": ["Raspberry Pi Zero", "ESP32", "Toaster (theoretical)"],
+      "capabilities": {
+        "max_plan_depth": 3,
+        "max_workers": 1,
+        "supported_models": ["tinyllama-8bit", "heuristic"],
+        "telemetry_interval_sec": 60,
+        "force_fallback": ["voice_recognition", "image_processing"]
+      },
+      "ai_assistant_rules": {
+        "auto_prune_intents": true,
+        "min_priority": 0.7,
+        "emergency_plan": "disable_non_critical"
+      }
+    },
+    "low-end": {
+      "examples": ["Raspberry Pi 4", "Old Smartphone"],
+      "capabilities": {
+        "max_plan_depth": 5,
+        "max_workers": 2,
+        "supported_models": ["tinyllama-4bit", "distilbert-onnx"],
+        "telemetry_interval_sec": 30,
+        "force_fallback": ["image_processing"]
+      },
+      "ai_assistant_rules": {
+        "auto_prune_intents": false,
+        "min_priority": 0.5,
+        "emergency_plan": "throttle_planner"
+      }
+    },
+    "high-end": {
+      "examples": ["Gaming PC", "Server"],
+      "capabilities": {
+        "max_plan_depth": 10,
+        "max_workers": 8,
+        "supported_models": ["llama3-gguf", "whisper-large"],
+        "telemetry_interval_sec": 5,
+        "force_fallback": []
+      },
+      "ai_assistant_rules": {
+        "auto_prune_intents": false,
+        "min_priority": 0.3,
+        "emergency_plan": "full_capability"
+      }
+    }
+  },
+  "dynamic_overrides": {
+    "rules": [
+      {
+        "condition": "avg_cpu > 90% for 5min",
+        "action": "downgrade_tier",
+        "ai_confirmation": true
+      },
+      {
+        "condition": "planner_timeout_rate > 20%",
+        "action": "enable_heuristic_fallback",
+        "ai_confirmation": false
+      }
+    ]
+  }
+}

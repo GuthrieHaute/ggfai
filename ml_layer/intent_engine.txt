@@ -1,0 +1,12 @@
+ml_layer/intent_engine.py (Latest "Hardened" Version):
+
+Current State: This version has an excellent structure with robust resilience (circuit breaker, retry, timeout), error handling (pydantic ErrorContext), concurrency (thread pool for resource checks), caching, and dynamic configuration loading (emergency protocols).
+What's Missing/Needs Finishing:
+Core Intent Processing Logic: This is the main gap. The _execute_processing(self, intent: Dict) -> Dict method is just a placeholder. It needs to be implemented to actually:
+Take the input data (which might be raw text, structured data from voice.py, or fused multi-modal data).
+Use the appropriate NLP libraries (spaCy, Rasa, Transformers?) and/or ML models (loaded via ModelAdapter, potentially calling Ollama for GGUF models) to analyze the input.
+Determine the user's intent.
+Extract relevant entities or parameters.
+Generate the final, structured output dictionary that represents the recognized intent tag (ready to be potentially converted into a Tag object by the caller or TagRegistry).
+(Refinement) Multi-Modal Fusion: If the engine needs to combine inputs from different sources (like snippet_fuse_intents.py demonstrated conceptually), that logic needs to be incorporated, likely within _execute_processing or a preceding step in process_intent.
+(Refinement/Security) eval() Usage: Consider replacing the eval() in _load_emergency_protocols with a safer method if the source of the protocol definitions in Redis cannot be absolutely trusted (e.g., use a dictionary mapping protocol names to function references).

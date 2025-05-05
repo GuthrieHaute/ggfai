@@ -1,0 +1,149 @@
+{
+    "patterns": [
+        {
+            "name": "greeting",
+            "phrases": [
+                "hello", "hi", "hey", "good morning", "good afternoon", 
+                "good evening", "howdy", "what's up", "morning", "afternoon", 
+                "evening", "yo", "hiya"
+            ],
+            "base_confidence": 0.9,
+            "requires_context": []
+        },
+        {
+            "name": "farewell",
+            "phrases": [
+                "goodbye", "bye", "see you", "talk to you later", "have a good one",
+                "catch you later", "take care", "until next time", "bye bye",
+                "signing off", "gotta go", "ttyl"
+            ],
+            "base_confidence": 0.9,
+            "requires_context": []
+        },
+        {
+            "name": "gratitude",
+            "phrases": [
+                "thank you", "thanks", "appreciate it", "grateful", "thank you so much",
+                "thanks a lot", "thanks!", "that's helpful", "you're the best",
+                "perfect, thanks", "awesome, thank you"
+            ],
+            "base_confidence": 0.9,
+            "requires_context": []
+        },
+        {
+            "name": "confusion",
+            "phrases": [
+                "what do you mean", "i don't understand", "could you explain",
+                "i'm confused", "not following", "what?", "huh?", "come again?",
+                "you lost me", "that doesn't make sense", "i'm not sure i get it"
+            ],
+            "base_confidence": 0.8,
+            "requires_context": ["previous_response"]
+        },
+        {
+            "name": "affirmative",
+            "phrases": [
+                "yes", "yeah", "sure", "okay", "alright", "definitely", "absolutely",
+                "yep", "yup", "of course", "sounds good", "that works",
+                "go ahead", "please do", "that's right"
+            ],
+            "base_confidence": 0.9,
+            "requires_context": ["pending_confirmation"]
+        },
+        {
+            "name": "negative",
+            "phrases": [
+                "no", "nope", "not really", "i don't think so", "negative",
+                "absolutely not", "nah", "not at all", "that's wrong",
+                "that's incorrect", "not quite"
+            ],
+            "base_confidence": 0.9,
+            "requires_context": ["pending_confirmation"]
+        },
+        {
+            "name": "help_request",
+            "phrases": [
+                "help", "can you help", "i need assistance", "how do i",
+                "how to", "help me", "need help", "can you assist",
+                "would you help", "having trouble with", "stuck with",
+                "not sure how to"
+            ],
+            "base_confidence": 0.7,
+            "requires_context": []
+        },
+        {
+            "name": "object_inquiry",
+            "phrases": [
+                "what is that", "what's this", "what do you see",
+                "can you identify", "what's that thing", "what are these",
+                "what am i looking at", "do you see this", "recognize this",
+                "tell me what you see"
+            ],
+            "base_confidence": 0.7,
+            "requires_context": ["visual_perception"]
+        },
+        {
+            "name": "emotional_support",
+            "phrases": [
+                "i'm worried", "i'm sad", "i'm frustrated", "this is hard",
+                "i can't do this", "feeling down", "stressed out",
+                "overwhelmed", "anxious", "upset", "having a rough time",
+                "not feeling great"
+            ],
+            "base_confidence": 0.8,
+            "requires_context": []
+        },
+        {
+            "name": "social_chat",
+            "phrases": [
+                "how are you", "what's up", "how's it going", "nice weather",
+                "how have you been", "what's new", "how's your day",
+                "how are things", "how's everything", "what's happening"
+            ],
+            "base_confidence": 0.6,
+            "requires_context": []
+        },
+        {
+            "name": "opinion_request",
+            "phrases": [
+                "what do you think", "your opinion", "do you believe",
+                "would you say", "what's your take", "your thoughts",
+                "how do you feel about", "what do you make of",
+                "your perspective", "your view"
+            ],
+            "base_confidence": 0.7,
+            "requires_context": ["current_topic"]
+        },
+        {
+            "name": "clarification_request",
+            "phrases": [
+                "can you clarify", "what exactly", "be more specific",
+                "elaborate", "could you explain more", "tell me more",
+                "give me more details", "what do you mean by",
+                "break it down", "simplify that"
+            ],
+            "base_confidence": 0.8,
+            "requires_context": ["previous_response"]
+        },
+        {
+            "name": "thinking_aloud",
+            "phrases": [
+                "let me see", "hmm", "well", "thinking",
+                "give me a moment", "one second", "just a sec",
+                "processing that", "considering"
+            ],
+            "base_confidence": 0.6,
+            "requires_context": []
+        },
+        {
+            "name": "correction",
+            "phrases": [
+                "that's wrong", "not what i meant", "you misunderstood",
+                "incorrect", "that's not right", "actually",
+                "let me rephrase", "what i meant was"
+            ],
+            "base_confidence": 0.8,
+            "requires_context": ["previous_response"]
+        }
+    ]
+}

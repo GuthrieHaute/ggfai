@@ -1,0 +1,9 @@
+iteration_control:
+  max_cycles: 100
+  min_success_rate: 0.8
+  max_error_rate: 0.2
+  max_resource_usage: 0.9
+  cycle_timeout_ms: 5000
+  pause_duration_ms: 1000
+  error_retry_count: 3
+  metrics_logging: true

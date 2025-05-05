@@ -1,0 +1,98 @@
+{
+    "greeting": [
+        "Hi there! How can I make your day easier?",
+        "Hello! I'm here if you need anything.",
+        "Hey! What's on your mind?",
+        "Hi! Always nice to chat with you. What can I help with?"
+    ],
+    "farewell": [
+        "Take care! Don't hesitate to reach out if you need anything.",
+        "Bye for now! Looking forward to our next chat.",
+        "See you soon! I'm here whenever you need me.",
+        "Have a great rest of your day! Come back anytime."
+    ],
+    "gratitude": [
+        "Happy to help! That's what I'm here for.",
+        "Glad I could make things easier for you!",
+        "You're very welcome! Always a pleasure.",
+        "No problem at all! Let me know if you need anything else."
+    ],
+    "confusion": [
+        "Let me try explaining that differently - {previous_response}",
+        "I get why that might not be clear. Here's another way to look at it: {previous_response}",
+        "Let me break that down a bit more simply: {previous_response}",
+        "Maybe I can explain it better this way: {previous_response}"
+    ],
+    "help_request": [
+        "Sure thing! What kind of help do you need?",
+        "I'd love to help out. What's going on?",
+        "Of course! Tell me what you're trying to do.",
+        "I'm all ears! What can I help you with?"
+    ],
+    "object_inquiry": [
+        "From what I can see, there's {visual_objects}. Want to know more about any of them?",
+        "I can spot {visual_objects} right now. What would you like to know?",
+        "I see {visual_objects}. Which one are you curious about?",
+        "There's {visual_objects} in view. Feel free to ask about any of them."
+    ],
+    "emotional_support": [
+        "I understand how you feel. Want to talk more about it?",
+        "That sounds really challenging. I'm here to listen and help if I can.",
+        "It's completely normal to feel that way. Let's work through this together.",
+        "I hear you, and your feelings are valid. How can I support you?"
+    ],
+    "social_chat": [
+        "I'm doing great, thanks for asking! How's your day going?",
+        "Pretty good! Always nice to chat with you. What's new?",
+        "Can't complain! How are you doing today?",
+        "All good here! How has your day been so far?"
+    ],
+    "opinion_request": [
+        "From what I understand, {analysis_result}. What do you think about that?",
+        "Based on what I know, {analysis_result}. Curious to hear your thoughts!",
+        "Well, {analysis_result}. Does that match your perspective?",
+        "I'd say {analysis_result}, but I'd love to hear your take on it."
+    ],
+    "clarification_request": [
+        "Sure, let me explain that better.",
+        "Happy to clarify! Here's what I mean...",
+        "Of course! Let me break that down for you.",
+        "Let me make that clearer for you."
+    ],
+    "unknown": [
+        "I'm not quite sure I follow. Could you explain that differently?",
+        "I want to help, but I'm a bit unsure what you mean. Mind elaborating?",
+        "Could you rephrase that? I want to make sure I understand correctly.",
+        "I'm drawing a blank here. Could you tell me more about what you need?"
+    ],
+    "clarification": [
+        "To help you better, could you tell me a bit more about that?",
+        "Mind sharing a few more details? That would help me give you a better response.",
+        "I want to make sure I understand completely. Could you elaborate?",
+        "Just so I'm on the right track - could you explain that further?"
+    ],
+    "error_acknowledgment": [
+        "Oops, that didn't quite work as planned. Let's try a different approach.",
+        "Sorry about that! Let me try something else.",
+        "That didn't go as expected. Mind if we try another way?",
+        "My mistake! Let's see if we can tackle this differently."
+    ],
+    "thinking": [
+        "Let me think about that for a moment...",
+        "Hmm, give me a second to process that...",
+        "Just thinking this through...",
+        "One moment while I consider that..."
+    ],
+    "success": [
+        "Great! That's all set for you.",
+        "Perfect! Everything's taken care of.",
+        "Done! Let me know if you need anything else.",
+        "All set! Was there anything else you wanted to do?"
+    ],
+    "confirmation_request": [
+        "Just to make sure - would you like me to {action}?",
+        "Before I do that, can I confirm that you want to {action}?",
+        "Should I go ahead and {action}?",
+        "Would you like me to {action} now?"
+    ]
+}

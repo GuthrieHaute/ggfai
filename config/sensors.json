@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "GGFAI Sensor Configuration - Defines available sensors and their properties",
+  "sensors": {
+    "temperature": {
+      "types": ["indoor", "outdoor", "device"],
+      "units": "C",
+      "range": [-40, 80],
+      "precision": 0.1,
+      "update_interval_sec": 60,
+      "priority": 0.7,
+      "category": "environmental"
+    },
+    "humidity": {
+      "types": ["indoor", "outdoor"],
+      "units": "%",
+      "range": [0, 100],
+      "precision": 0.1,
+      "update_interval_sec": 60,
+      "priority": 0.6,
+      "category": "environmental"
+    },
+    "light": {
+      "types": ["indoor", "outdoor"],
+      "units": "lux",
+      "range": [0, 100000],
+      "precision": 1,
+      "update_interval_sec": 30,
+      "priority": 0.5,
+      "category": "environmental"
+    },
+    "motion": {
+      "types": ["indoor", "outdoor", "entry"],
+      "units": "boolean",
+      "range": [0, 1],
+      "precision": 1,
+      "update_interval_sec": 5,
+      "priority": 0.8,
+      "category": "security"
+    },
+    "door": {
+      "types": ["entry", "interior", "garage"],
+      "units": "boolean",
+      "range": [0, 1],
+      "precision": 1,
+      "update_interval_sec": 5,
+      "priority": 0.8,
+      "category": "security"
+    },
+    "window": {
+      "types": ["entry", "interior"],
+      "units": "boolean",
+      "range": [0, 1],
+      "precision": 1,
+      "update_interval_sec": 5,
+      "priority": 0.8,
+      "category": "security"
+    },
+    "air_quality": {
+      "types": ["co2", "voc", "pm25", "pm10"],
+      "units": "ppm",
+      "range": [0, 5000],
+      "precision": 1,
+      "update_interval_sec": 300,
+      "priority": 0.6,
+      "category": "environmental"
+    },
+    "power": {
+      "types": ["consumption", "generation", "battery"],
+      "units": "W",
+      "range": [0, 10000],
+      "precision": 0.1,
+      "update_interval_sec": 60,
+      "priority": 0.6,
+      "category": "energy"
+    },
+    "water": {
+      "types": ["flow", "leak"],
+      "units": "L/min",
+      "range": [0, 100],
+      "precision": 0.1,
+      "update_interval_sec": 60,
+      "priority": 0.7,
+      "category": "utility"
+    },
+    "presence": {
+      "types": ["person", "pet", "vehicle"],
+      "units": "count",
+      "range": [0, 20],
+      "precision": 1,
+      "update_interval_sec": 10,
+      "priority": 0.8,
+      "category": "occupancy"
+    }
+  },
+  "locations": [
+    "living_room",
+    "kitchen",
+    "bedroom",
+    "bathroom",
+    "hallway",
+    "entry",
+    "garage",
+    "outdoor",
+    "basement"
+  ],
+  "integrations": {
+    "mqtt": {
+      "enabled": true,
+      "broker": "localhost",
+      "port": 1883,
+      "topic_prefix": "ggfai/sensors/"
+    },
+    "rest_api": {
+      "enabled": false,
+      "endpoint": "http://localhost:8080/api/sensors",
+      "auth_token": ""
+    },
+    "hardware": {
+      "enabled": false,
+      "interface": "gpio",
+      "scan_interval_sec": 5
+    }
+  }
+}

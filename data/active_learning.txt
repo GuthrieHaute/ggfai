@@ -1,0 +1,8 @@
+# Active Learning Data
+# This file contains uncertain predictions for manual review
+# Format: One prediction per line
+# 
+# Example:
+# turn on the lights in the kitchen
+# what's the weather like today
+# play some relaxing music

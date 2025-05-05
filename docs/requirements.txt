@@ -1,0 +1,65 @@
+# Core ML/DL dependencies
+numpy>=1.24.0
+torch>=2.0.0
+tensorflow>=2.14.0  # Includes TFLite
+onnxruntime>=1.15.0
+safetensors>=0.4.0
+
+# NLP and Language Model dependencies 
+transformers>=4.35.0
+spacy>=3.7.0
+llama-cpp-python>=0.2.0
+ollama>=0.1.0
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn>=0.24.0
+websockets>=12.0
+
+# Audio Processing
+SpeechRecognition>=3.10.0
+
+# Sensor Integration
+paho-mqtt>=2.2.0  # Optional: For MQTT sensor integration
+pyserial>=3.5    # Optional: For serial device communication
+
+# Utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+tenacity>=8.0.0  # For retry functionality
+
+# Core dependencies
+networkx>=2.6.0
+pyvis>=0.1.9
+psutil>=5.8.0
+pytest>=6.2.5
+pytest-asyncio>=0.15.1
+
+# Async support
+asyncio>=3.4.3
+
+# Resource monitoring
+psutil>=5.8.0
+
+# Visualization
+pyvis>=0.1.9
+networkx>=2.6.0
+
+# Testing
+pytest>=6.2.5
+pytest-asyncio>=0.15.1
+pytest-cov>=2.12.0
+pytest-benchmark>=3.4.1
+
+# Type checking
+mypy>=0.910
+typing-extensions>=3.10.0
+
+# Performance monitoring
+memory-profiler>=0.58.0
+line-profiler>=3.3.0
+
+# Development tools
+black>=21.7b0
+isort>=5.9.3
+flake8>=3.9.2

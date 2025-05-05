@@ -1,0 +1,168 @@
+/* GGFAI Dashboard - Bootstrap Edition Custom Styles */
+
+/* Custom styles to enhance Bootstrap */
+.main-narrative {
+    font-size: 1.1rem;
+    line-height: 1.5;
+}
+
+/* Tag visualization container */
+#tag-viz-container {
+    height: 500px;
+    width: 100%;
+    position: relative;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
+/* Explanation visualization */
+.explanation-viz {
+    height: 300px;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
+/* Pulse animation for recording button */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 107, 107, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 107, 107, 0);
+    }
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.status-active {
+    background-color: #8ac926;
+}
+
+.status-inactive {
+    background-color: #aaaaaa;
+}
+
+.status-error {
+    background-color: #ff6b6b;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #tag-viz-container {
+        height: 400px;
+    }
+    
+    .explanation-viz {
+        height: 250px;
+    }
+}
+
+/* Dark mode enhancements */
+.sidebar[data-background-color="dark"] .nav-secondary .nav-item a p,
+.sidebar[data-background-color="dark"] .nav-secondary .nav-item a i {
+    color: #f0f0f0;
+}
+
+.sidebar[data-background-color="dark"] .nav-secondary .nav-item.active a p,
+.sidebar[data-background-color="dark"] .nav-secondary .nav-item.active a i {
+    color: #4a8fe7;
+}
+
+/* Custom scrollbar for visualization containers */
+#tag-viz-container::-webkit-scrollbar,
+.explanation-viz::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#tag-viz-container::-webkit-scrollbar-track,
+.explanation-viz::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+#tag-viz-container::-webkit-scrollbar-thumb,
+.explanation-viz::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+#tag-viz-container::-webkit-scrollbar-thumb:hover,
+.explanation-viz::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Microphone button animation */
+#mic-btn.btn-danger {
+    animation: pulse 1.5s infinite;
+}
+
+/* Card title emphasis */
+.card-title {
+    font-weight: 600;
+}
+
+/* Enhance accordion styling */
+.accordion-button:not(.collapsed) {
+    background-color: rgba(74, 143, 231, 0.1);
+    color: #4a8fe7;
+}
+
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.25rem rgba(74, 143, 231, 0.25);
+}
+
+/* Enhance notification styling */
+.alert-success {
+    background-color: #4ecdc4;
+}
+
+.alert-danger {
+    background-color: #ff6b6b;
+}
+
+.alert-warning {
+    background-color: #ffe66d;
+}
+
+.alert-info {
+    background-color: #4a8fe7;
+}
+
+/* Voice settings styles */
+.voice-settings-icon {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #4a8fe7;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: all 0.2s ease;
+}
+
+.voice-settings-icon:hover {
+    transform: scale(1.1);
+    background: #2980b9;
+}
+
+#mic-btn {
+    position: relative;
+}

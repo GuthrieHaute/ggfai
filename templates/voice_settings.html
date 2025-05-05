@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GGFAI Voice Processing Settings</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/voice_dashboard.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GGFAI Framework</h1>
+            <nav>
+                <ul>
+                    <li><a href="/">Dashboard</a></li>
+                    <li><a href="/voice" class="active">Voice Settings</a></li>
+                    <li><a href="/settings">System Settings</a></li>
+                </ul>
+            </nav>
+        </header>
+        
+        <main>
+            <h1>Voice Processing Settings</h1>
+            <p>Configure speech recognition and text-to-speech settings for the GGFAI Framework.</p>
+            
+            <div id="voice-dashboard-container"></div>
+            
+            <div class="card">
+                <h2>Voice Processing Demo</h2>
+                <div class="demo-controls">
+                    <button id="start-listening-btn" class="btn primary">Start Listening</button>
+                    <button id="stop-listening-btn" class="btn" disabled>Stop Listening</button>
+                    <span id="listening-status"></span>
+                </div>
+                
+                <div class="recognition-results">
+                    <h3>Recognition Results</h3>
+                    <div id="recognition-text" class="result-box">
+                        <p class="placeholder">Speak to see recognition results...</p>
+                    </div>
+                </div>
+                
+                <div class="tts-demo">
+                    <h3>Text-to-Speech Demo</h3>
+                    <textarea id="tts-demo-text" placeholder="Enter text to speak...">Welcome to the GGFAI Framework voice processing demo. This system supports multiple speech recognition and text-to-speech engines.</textarea>
+                    <button id="speak-demo-btn" class="btn primary">Speak Text</button>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>&copy; 2023 GGFAI Framework</p>
+        </footer>
+    </div>
+    
+    <script src="/static/voice_dashboard.js"></script>
+    <script>
+        // Initialize voice dashboard with default config
+        const defaultConfig = {
+            energy_threshold: 300,
+            pause_threshold: 0.8,
+            dynamic_energy_threshold: true,
+            recognition_engines: ['GOOGLE', 'SPHINX'],
+            vad_system: 'ENERGY',
+            vad_sensitivity: 2,
+            vad_threshold: 0.5,
+            tts_engine: 'SYSTEM',
+            tts_voice: 'default',
+            tts_rate: 175,
+            tts_volume: 1.0,
+            api_keys: {
+                'elevenlabs_key': '',
+                'azure_key': '',
+                'google_cloud_key': ''
+            }
+        };
+        
+        const voiceDashboard = new VoiceDashboard('voice-dashboard-container', defaultConfig, (config) => {
+            console.log('Config updated:', config);
+            // In a real implementation, this would send the config to the server
+            fetch('/api/voice/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Config saved:', data);
+            })
+            .catch(error => {
+                console.error('Error saving config:', error);
+            });
+        });
+        
+        // Demo functionality
+        const startListeningBtn = document.getElementById('start-listening-btn');
+        const stopListeningBtn = document.getElementById('stop-listening-btn');
+        const listeningStatus = document.getElementById('listening-status');
+        const recognitionText = document.getElementById('recognition-text');
+        const ttsDemoText = document.getElementById('tts-demo-text');
+        const speakDemoBtn = document.getElementById('speak-demo-btn');
+        
+        let isListening = false;
+        
+        startListeningBtn.addEventListener('click', () => {
+            isListening = true;
+            startListeningBtn.disabled = true;
+            stopListeningBtn.disabled = false;
+            listeningStatus.textContent = 'Listening...';
+            recognitionText.innerHTML = '<p class="placeholder">Listening...</p>';
+            
+            // In a real implementation, this would start the voice recognition
+            // For demo purposes, we'll simulate recognition after a delay
+            setTimeout(() => {
+                if (isListening) {
+                    recognitionText.innerHTML = '<p>I heard: "What\'s the weather like today?"</p>';
+                    listeningStatus.textContent = 'Recognized speech';
+                    
+                    // Simulate intent processing
+                    setTimeout(() => {
+                        if (isListening) {
+                            recognitionText.innerHTML += `
+                                <div class="intent-card">
+                                    <h4>Detected Intent</h4>
+                                    <pre>{
+  "intent": "get_weather",
+  "category": "information",
+  "confidence": 0.92,
+  "text": "What's the weather like today?",
+  "source": "voice"
+}</pre>
+                                </div>
+                            `;
+                        }
+                    }, 1000);
+                }
+            }, 2000);
+        });
+        
+        stopListeningBtn.addEventListener('click', () => {
+            isListening = false;
+            startListeningBtn.disabled = false;
+            stopListeningBtn.disabled = true;
+            listeningStatus.textContent = 'Stopped listening';
+        });
+        
+        speakDemoBtn.addEventListener('click', () => {
+            const text = ttsDemoText.value.trim();
+            
+            if (!text) {
+                alert('Please enter text to speak');
+                return;
+            }
+            
+            speakDemoBtn.disabled = true;
+            speakDemoBtn.textContent = 'Speaking...';
+            
+            // In a real implementation, this would call the TTS API
+            // For demo purposes, we'll just simulate speaking
+            setTimeout(() => {
+                speakDemoBtn.disabled = false;
+                speakDemoBtn.textContent = 'Speak Text';
+            }, 2000);
+        });
+    </script>
+    
+    <style>
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .demo-controls {
+            margin-bottom: 20px;
+        }
+        
+        .result-box {
+            background: #f5f5f5;
+            border-radius: 6px;
+            padding: 15px;
+            min-height: 100px;
+            margin-bottom: 20px;
+        }
+        
+        .placeholder {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .intent-card {
+            background: #e8f4fc;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .intent-card h4 {
+            margin-top: 0;
+            color: #2980b9;
+        }
+        
+        .intent-card pre {
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        .tts-demo textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        
+        .vad-settings {
+            padding: 10px;
+            margin-top: 5px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #3498db;
+        }
+        
+        .vad-settings small {
+            display: block;
+            color: #666;
+            margin-top: 5px;
+            font-size: 0.85em;
+        }
+    </style>
+</body>
+</html>
