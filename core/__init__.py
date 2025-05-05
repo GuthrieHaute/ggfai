@@ -1,10 +1,17 @@
-# Initialize shared relationship logger
-from .relationship_logger import RelationshipLogger
-REL_LOGGER = RelationshipLogger()
+"""
+GGFAI Core Components
+Contains foundational modules like tag registry and circuit breaker.
+"""
 
-# Make available to all trackers
-from .intent_tracker import IntentTracker
-INTENT_TRACKER = IntentTracker()
-INTENT_TRACKER.relationship_logger = REL_LOGGER  # Inject dependency
+from .tag_registry import TagRegistry, Tag, TagStatus, TagPriority
+from .run_with_grace import run_with_grace
+from .tag_sharing import TagSharingSystem
 
-# Repeat for other trackers...
+__all__ = [
+    'TagRegistry',
+    'Tag',
+    'TagStatus',
+    'TagPriority',
+    'run_with_grace',
+    'TagSharingSystem'
+]
