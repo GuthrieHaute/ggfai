@@ -2,7 +2,7 @@
 
 **Document Version:** 1.0
 **Date:** May 6, 2025
-**Authors:** Ryan Guthrie
+**Author:** Ryan Guthrie
 **Status:** Initial Draft
 
 ## 1. Introduction & Abstract
